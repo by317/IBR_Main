@@ -1,0 +1,34 @@
+[Basic Page]
+m_strPrjFileName = C:\Users\benyork\Documents\Code_Composer\Micro-DC_DC_v1\EasyDSP\Micro-DC_DC.ezd
+m_strHexFileName = 
+m_strCoffFileName = C:\Users\benyork\Documents\Code_Composer\Micro-DC_DC_v1\Debug\IBI.out
+m_strDSPType = TMS320F28026
+m_strCommPort = SCI
+[Parallel & RS232 Port]
+m_nDelayBetweenClock = 10
+m_nDelayBetweenMemoryAccess = 500
+m_nResetMethod = 0
+m_uResetAddress = 0
+m_nResetValue = 0
+m_strProtocol = Normal
+[USB Port]
+m_uBPS = 115200
+m_uWaitMoreMicroTime = 1000
+m_uOscClkFreq = 30
+m_bBluetoothEnabled = 0
+[Miscellaneous]
+m_bVariableAutoSeek = 1
+m_bCharDisp = 1
+m_bStopWhenSuccessiveFail = 0
+m_strEditor = 
+[FlashROM]
+m_strFlashRom = 
+m_strFlashWidth = 8 bit
+m_uBootAddress = 0
+m_uFlashROMStartAddress = 0
+m_uIOSTRB = 0
+m_uSTRB = 0
+m_uSTRB0 = 0
+m_uSTRB1 = 0
+[Project Information]
+m_uVersion = 448
