@@ -9,6 +9,10 @@
 //#define VBUS_SCALE	508		//Scaling for Q15 Format
 //#define	I_SCALE		150		//Scaling for Q15 Format
 
+#define v_b0 2418
+#define v_b1 -4190
+#define v_b2 1814
+
 unsigned int VIN_SCALE;
 unsigned int VBUS_SCALE;
 unsigned int I_SCALE;
@@ -22,9 +26,19 @@ unsigned int period;
 unsigned int overlap;
 unsigned int rising_edge_delay;
 unsigned int falling_edge_delay;
-int Input_Voltage_W;
-int Input_Voltage_F;
+unsigned int first_run;
 int y;
+
+long int OUT_MAX;
+long int duty_output;
+long int err_delay1;
+long int err_delay2;
+long int out_delay1;
+long int vcomp_out;
+long int Vin_reference_Q15;
+long long int v_comp_out;
+long int Vin_err_Q15;
+long int control_gain;
 
 int32 Input_Voltage_Q15;
 int32 Bus_Voltage_Q15;
@@ -65,8 +79,12 @@ void main()
 	ERTM;
 	for(;;)
 	{
-		Input_Voltage_W = Input_Voltage_Q15 >> 15;
-		Input_Voltage_F = ((Input_Voltage_Q15 << 17) >> 5);
+		EPwm1Regs.DBRED = rising_edge_delay;
+		EPwm1Regs.DBFED = falling_edge_delay;
+		EPwm1Regs.TBPRD = period;
+
+		Bus_Voltage_Q15 = ((long int) AdcResult.ADCRESULT1*VBUS_SCALE);
+		Input_Current_Q15 = ((long int) AdcResult.ADCRESULT2*I_SCALE);
 	}
 }
 
@@ -76,11 +94,31 @@ interrupt void pwm_int()
 	AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
 	Input_Voltage_Q15 = ((long int) AdcResult.ADCRESULT0*VIN_SCALE);
-	Bus_Voltage_Q15 = ((long int) AdcResult.ADCRESULT1*VBUS_SCALE);
-	Input_Current_Q15 = ((long int) AdcResult.ADCRESULT2*I_SCALE);
-	EPwm1Regs.DBRED = rising_edge_delay;
-	EPwm1Regs.DBFED = falling_edge_delay;
-	EPwm1Regs.TBPRD = period;
+	Vin_err_Q15 = Input_Voltage_Q15 - Vin_reference_Q15;
+	if (first_run)
+	{
+		err_delay1 = Vin_err_Q15;
+		err_delay2 = Vin_err_Q15;
+		out_delay1 = 0;
+		first_run = 0;
+	}
+	v_comp_out = ((long long int) Vin_err_Q15*v_b0 + err_delay1*v_b1 + err_delay2*v_b2 + out_delay1)>>15;
+
+	if (v_comp_out < 0)
+	{
+		v_comp_out = 0;
+	}
+	else if (v_comp_out > OUT_MAX)
+	{
+		v_comp_out = OUT_MAX;
+	}
+	out_delay1 = v_comp_out;
+	err_delay2 = err_delay1;
+	err_delay1 = Vin_err_Q15;
+
+	duty_output = ((long long int) v_comp_out*control_gain >> 20);
+	duty = ((unsigned int) duty_output);
+
 	EPwm1Regs.CMPA.half.CMPA = duty;
 	EPwm1Regs.ETCLR.bit.INT = 0x1;  			//Clear the Interrupt Flag
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;  	//Acknowledge the interrupt
@@ -111,8 +149,6 @@ void ms_delay(unsigned int wait_time)
 
 void InitAdc(void)
 {
-    extern void DSP28x_usDelay(Uint32 Count);
-
     // *IMPORTANT*
     // The Device_cal function, which copies the ADC calibration values from TI reserved
     // OTP into the ADCREFSEL and ADCOFFTRIM registers, occurs automatically in the
@@ -167,11 +203,14 @@ void SetupAdc(void)
 
 void initVariables (void)
 {
+	first_run = 1;
 	Input_Voltage_Q15 = 0;
 	Bus_Voltage_Q15 = 0;
 	Input_Current_Q15 = 0;
 	VIN_SCALE = 508;
 	VBUS_SCALE = 667;
 	I_SCALE = 150;
+	OUT_MAX = 0x599A;
+	control_gain = 0x8000;
 }
 
