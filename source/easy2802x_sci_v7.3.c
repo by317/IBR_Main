@@ -7,6 +7,9 @@
 #include "easy2802x_sci_v7.3.h"
 #include "RingBuff.h"
 
+#pragma CODE_SECTION(easy_RXINT_ISR, "ramfuncs");
+#pragma CODE_SECTION(easy_TXINT_ISR, "ramfuncs");
+
 /////////////////////////////////////////////////////////////////
 // NOTICE : Please change below CPU_CLK, LSP_CLK, BAUDRATE
 //          according to your system
@@ -15,14 +18,14 @@
 //#define CPU_CLK		60000000L					// 60MHz 	// 여기를 바꿔라.
 #define CPU_CLK		60000000L				// 40MHz 
 #define	LSP_CLK		(CPU_CLK/4)
-#define	BAUDRATE	115200L
+//#define	BAUDRATE	115200L
 //#define	BAUDRATE	1200L
 //#define	BAUDRATE	2400L
 //#define	BAUDRATE	4800L
 //#define	BAUDRATE	9600L
 //#define	BAUDRATE	19200L	
 //#define	BAUDRATE	38400L
-//#define	BAUDRATE	57600L
+#define	BAUDRATE	57600L
 //#define	BAUDRATE	86400L
 //#define	BAUDRATE	153600L
 //#define	BAUDRATE	192000L

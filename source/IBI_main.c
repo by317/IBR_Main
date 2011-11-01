@@ -4,6 +4,8 @@
 #include "DSP2802x_GlobalPrototypes.h"
 #include "Piccolo_PWM.h"
 
+//#pragma CODE_SECTION(pwm_int, "ramfuncs");
+
 
 //#define VIN_SCALE	508		//Scaling for Q15 Format
 //#define VBUS_SCALE	508		//Scaling for Q15 Format
@@ -12,6 +14,11 @@
 #define v_b0 2418
 #define v_b1 -4190
 #define v_b2 1814
+#define OUT_MAX 0x599A
+#define DELAY_MAX 45876 //(+1.4)
+#define DELAY_MIN -45876 //(-1.4)
+
+#pragma CODE_SECTION(pwm_int, "ramfuncs");
 
 unsigned int VIN_SCALE;
 unsigned int VBUS_SCALE;
@@ -21,24 +28,27 @@ interrupt void pwm_int(void);
 void pwm_setup(void);
 
 unsigned int x;
-unsigned int duty;
+volatile unsigned int duty;
 unsigned int period;
 unsigned int overlap;
 unsigned int rising_edge_delay;
 unsigned int falling_edge_delay;
-unsigned int first_run;
+volatile unsigned int first_run;
 int y;
 
-long int OUT_MAX;
-long int duty_output;
-long int err_delay1;
-long int err_delay2;
-long int out_delay1;
-long int vcomp_out;
-long int Vin_reference_Q15;
-long long int v_comp_out;
-long int Vin_err_Q15;
-long int control_gain;
+extern Uint16 RamfuncsLoadStart;
+extern Uint16 RamfuncsLoadEnd;
+extern Uint16 RamfuncsRunStart;
+
+volatile long int duty_output;
+volatile long int err_delay1;
+volatile long int err_delay2;
+volatile long int out_delay1;
+volatile long int Vin_reference_Q15;
+volatile long long int v_comp_out;
+volatile long int Vin_err_Q15;
+volatile long int control_gain;
+volatile long long int v_temporary;
 
 int32 Input_Voltage_Q15;
 int32 Bus_Voltage_Q15;
@@ -52,11 +62,6 @@ void main()
 {
 	initVariables();
 	
-	rising_edge_delay = DB_RED;
-	falling_edge_delay = DB_FED;
-	overlap = 0;
-	duty = 500;
-	period = 1000;
 	DINT;
 	ms_delay(1);
 	InitAdc();
@@ -65,6 +70,7 @@ void main()
 	InitPieCtrl();
 	IER = 0x0000;
 	IFR = 0x0000;
+	MemCopy(&RamfuncsLoadStart, &RamfuncsLoadEnd, &RamfuncsRunStart);
 	InitPieVectTable();
 	easyDSP_SCI_Init();
 	InitEPwm1();
@@ -77,19 +83,21 @@ void main()
 	IER |= M_INT3;
 	EINT;
 	ERTM;
-	for(;;)
-	{
-		EPwm1Regs.DBRED = rising_edge_delay;
-		EPwm1Regs.DBFED = falling_edge_delay;
-		EPwm1Regs.TBPRD = period;
-
-		Bus_Voltage_Q15 = ((long int) AdcResult.ADCRESULT1*VBUS_SCALE);
-		Input_Current_Q15 = ((long int) AdcResult.ADCRESULT2*I_SCALE);
-	}
+//	for(;;)
+//	{
+////		EPwm1Regs.DBRED = rising_edge_delay;
+////		EPwm1Regs.DBFED = falling_edge_delay;
+////		EPwm1Regs.TBPRD = period;
+////
+////		Bus_Voltage_Q15 = ((long int) AdcResult.ADCRESULT1*VBUS_SCALE);
+////		Input_Current_Q15 = ((long int) AdcResult.ADCRESULT2*I_SCALE);
+//	}
 }
 
 interrupt void pwm_int()
 {
+	DINT;
+	GpioDataRegs.GPASET.bit.GPIO3 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC0 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
@@ -102,7 +110,16 @@ interrupt void pwm_int()
 		out_delay1 = 0;
 		first_run = 0;
 	}
-	v_comp_out = ((long long int) Vin_err_Q15*v_b0 + err_delay1*v_b1 + err_delay2*v_b2 + out_delay1)>>15;
+
+	v_temporary = (Vin_err_Q15*v_b0) >> 15;
+	v_temporary = v_temporary + ((err_delay1*v_b1)>>15);
+	v_temporary = v_temporary + ((err_delay2*v_b2)>>15);
+	v_temporary = v_temporary + (out_delay1);
+	v_temporary = v_temporary;
+
+	v_comp_out = v_temporary;
+
+	out_delay1 = v_comp_out;
 
 	if (v_comp_out < 0)
 	{
@@ -112,14 +129,25 @@ interrupt void pwm_int()
 	{
 		v_comp_out = OUT_MAX;
 	}
-	out_delay1 = v_comp_out;
+	if (out_delay1 < DELAY_MIN)
+	{
+		out_delay1 = DELAY_MIN;
+	}
+	else if (out_delay1 > DELAY_MAX)
+	{
+		out_delay1 = DELAY_MAX;
+	}
+
+
 	err_delay2 = err_delay1;
 	err_delay1 = Vin_err_Q15;
 
-	duty_output = ((long long int) v_comp_out*control_gain >> 20);
+	duty_output = ((long long int) v_comp_out >> 5);
 	duty = ((unsigned int) duty_output);
 
 	EPwm1Regs.CMPA.half.CMPA = duty;
+	GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
+	EINT;
 	EPwm1Regs.ETCLR.bit.INT = 0x1;  			//Clear the Interrupt Flag
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;  	//Acknowledge the interrupt
 	return;
@@ -127,8 +155,13 @@ interrupt void pwm_int()
 
 void pwm_setup()
 {
+	EALLOW;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO3 = 0x0;
+	GpioCtrlRegs.GPADIR.bit.GPIO3 = 1;
+	EDIS;
+
 	EPwm1Regs.ETSEL.bit.INTEN = 0x1;
-	EPwm1Regs.ETSEL.bit.INTSEL = 0x2;
+	EPwm1Regs.ETSEL.bit.INTSEL = 0x1;
 	EPwm1Regs.ETPS.bit.INTPRD = 0x1;	
 }
 
@@ -203,6 +236,11 @@ void SetupAdc(void)
 
 void initVariables (void)
 {
+	rising_edge_delay = DB_RED;
+	falling_edge_delay = DB_FED;
+	overlap = 0;
+	duty = 0;
+	period = 1000;
 	first_run = 1;
 	Input_Voltage_Q15 = 0;
 	Bus_Voltage_Q15 = 0;
@@ -210,7 +248,9 @@ void initVariables (void)
 	VIN_SCALE = 508;
 	VBUS_SCALE = 667;
 	I_SCALE = 150;
-	OUT_MAX = 0x599A;
 	control_gain = 0x8000;
+	v_temporary = 0;
+	Vin_reference_Q15 = 0x8000;
+	Vin_reference_Q15 = -5*Vin_reference_Q15;
 }
 

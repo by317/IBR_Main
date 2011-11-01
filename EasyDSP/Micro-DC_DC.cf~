@@ -17,7 +17,7 @@ SecG = 0
 SecH = 0
 SecI = 0
 SecJ = 0
-XFile = C:\Program Files (x86)\easyDSP\easyDSP-v7.4\Source\2802x\F28026_flashAPI_wrapper_v7.4.out
+XFile = C:\Program Files (x86)\easyDSP\easyDSP-v7.3\Source\2802x\F28026_flashAPI_wrapper.out
 [Frame Activity]
 Register Frame = 0
 Watch Frame-0 = 0
@@ -40,8 +40,8 @@ Watch Frame-8 = 0
 Watch Frame-8 (Name) = 
 Watch Frame-9 = 0
 Watch Frame-9 (Name) = 
-Command Frame-0 = 1
-Command Frame-0 (Name) = Command-1
+Command Frame-0 = 0
+Command Frame-0 (Name) = 
 Command Frame-1 = 0
 Command Frame-1 (Name) = 
 Command Frame-2 = 0
@@ -266,6 +266,10 @@ first visible line = 0
 first visible line = 0
 [Recent contents of Command-2 window]
 
+[Register Window]
+Update time = 1 sec
+[Register Recent Index]
+Recent Index = 30
 [Recent contents of Command-1 window]
 duty = 580
 falling_edge_delay = 20
@@ -282,13 +286,14 @@ rising_edge_delay = 20
 
 
 
+
 [Watch-1 Watched Variables]
+Vin_err_Q15
+Vin_reference_Q15
 duty
 falling_edge_delay
 period
 rising_edge_delay
+v_comp_out
+v_temporary
 
-[Register Window]
-Update time = 1 sec
-[Register Recent Index]
-Recent Index = 30
