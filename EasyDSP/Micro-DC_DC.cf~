@@ -20,8 +20,8 @@ SecJ = 0
 XFile = C:\Program Files (x86)\easyDSP\easyDSP-v7.3\Source\2802x\F28026_flashAPI_wrapper.out
 [Frame Activity]
 Register Frame = 0
-Watch Frame-0 = 0
-Watch Frame-0 (Name) = 
+Watch Frame-0 = 1
+Watch Frame-0 (Name) = Watch-1
 Watch Frame-1 = 0
 Watch Frame-1 (Name) = 
 Watch Frame-2 = 0
@@ -296,4 +296,5 @@ period
 rising_edge_delay
 v_comp_out
 v_temporary
+out_delay1
 

@@ -11,9 +11,15 @@
 //#define VBUS_SCALE	508		//Scaling for Q15 Format
 //#define	I_SCALE		150		//Scaling for Q15 Format
 
-#define v_b0 2418
-#define v_b1 -4190
-#define v_b2 1814
+//#define v_b0 2418
+//#define v_b1 -4190
+//#define v_b2 1814
+
+#define v_b0 256
+#define v_b1 -444
+#define v_b2 230
+
+
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
 #define DELAY_MIN -45876 //(-1.4)

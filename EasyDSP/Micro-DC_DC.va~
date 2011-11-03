@@ -90,7 +90,7 @@ ezDSP_ulData 5320
 ezDSP_ullData 5320
 falling_edge_delay 5320
 first_run 5320
-out_delay1 5320
+out_delay1 1005320
 overlap 5320
 period 5320
 rising_edge_delay 5320

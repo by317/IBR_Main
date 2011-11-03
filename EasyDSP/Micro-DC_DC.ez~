@@ -12,7 +12,7 @@ m_uResetAddress = 0
 m_nResetValue = 0
 m_strProtocol = Normal
 [USB Port]
-m_uBPS = 115200
+m_uBPS = 57600
 m_uWaitMoreMicroTime = 1000
 m_uOscClkFreq = 30
 m_bBluetoothEnabled = 0
