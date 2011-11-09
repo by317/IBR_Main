@@ -4,9 +4,6 @@
 #include "DSP2802x_GlobalPrototypes.h"
 #include "Piccolo_PWM.h"
 
-//#pragma CODE_SECTION(pwm_int, "ramfuncs");
-
-
 //#define VIN_SCALE	508		//Scaling for Q15 Format
 //#define VBUS_SCALE	508		//Scaling for Q15 Format
 //#define	I_SCALE		150		//Scaling for Q15 Format
