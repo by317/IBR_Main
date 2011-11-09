@@ -16,18 +16,34 @@
 #define v_b1 -444
 #define v_b2 230
 
+#define MIN_OPERATING_VOLTAGE 491520; //Minimum Operating Voltage of 15V
+#define MIN_STARTUP_VOLTAGE 655360 //Minimum Startup Voltage of 20V
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
 #define DELAY_MIN -45876 //(-1.4)
 
 #pragma CODE_SECTION(pwm_int, "ramfuncs");
+#pragma CODE_SECTION(mppt_int, "ramfuncs");
 
+
+//ADC Scaling/Offset Variables
 unsigned int VIN_SCALE;
 unsigned int VBUS_SCALE;
 unsigned int I_SCALE;
+unsigned int I_OFFSET;
+
+//MPPT Variables
+unsigned int step_direction;
+unsigned int startup_flag;
+long int Min_Startup_Voltage_Q15;
+long int Min_Operating_Voltage_Q15;
+long int Previous_Power_Q15;
+long int MPPT_Step_Size_Q15
 
 interrupt void pwm_int(void);
+interrupt void mppt_int(void);
+
 void pwm_setup(void);
 
 unsigned int x;
@@ -60,6 +76,7 @@ extern void DSP28x_usDelay(Uint32);
 void ms_delay(unsigned int);
 void SetupAdc(void);
 void initVariables(void);
+void initialize_mppt_timer(void);
 
 void main()
 {
@@ -80,10 +97,12 @@ void main()
 	pwm_setup();
 	InitEPwm1Gpio();
 	EALLOW;
+	PieVectTable.TINT2 = &mppt_int;
 	PieVectTable.EPWM1_INT = &pwm_int;
 	PieCtrlRegs.PIEIER3.bit.INTx1 = 0x1;
 	EDIS;
 	IER |= M_INT3;
+	IER |= M_INT14;
 	EINT;
 	ERTM;
 //	for(;;)
@@ -95,6 +114,60 @@ void main()
 ////		Bus_Voltage_Q15 = ((long int) AdcResult.ADCRESULT1*VBUS_SCALE);
 ////		Input_Current_Q15 = ((long int) AdcResult.ADCRESULT2*I_SCALE);
 //	}
+}
+
+interrupt void mppt_int()
+{
+	Input_Current_Q15 = ((long int) (AdcResult.ADCRESULT2 - I_OFFSET )*I_SCALE);
+	Input_Power_Q15 = ((long long int) Input_Voltage_Q15*Input_Current_Q15 >> 15);
+	if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
+	{
+		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size;
+		step_dir = 0;
+		startup_flag = 1;
+	}
+	else if (Input_Voltage_Q15 <= Min_Operating_Voltage)
+	{
+		Vin_reference_Q15 = Min_Operating_Voltage + MPPT_Step_Size;
+		step_direction = 1;
+	}
+	else if (Input_Voltage_Q15 >= Max_Operating_Voltage)
+	{
+		Vin_reference_Q15 = Max_Operating_Voltage - MPPT_Step_Size;
+		step_direction = 0;
+	}
+	else if (startup_flag)
+	{
+		if (Input_Power_Q15 > Previous_Power_Q15)
+		{
+			if (step_direction)
+			{
+				Vin_reference_Q15 += MPPT_Step_Size;
+			}
+			else
+			{
+				Vin_reference_Q15 -= MPPT_Step_Size;
+			}
+		}
+		else
+		{
+			if (step_direction)
+			{
+				step_direction = !step_direction;
+				Vin_reference_Q15 -= MPPT_Step_Size;
+			}
+			else
+			{
+				step_direction = !step_direction;
+				Vin_reference_Q15 += MPPT_Step_Size;
+			}
+		}
+	}
+	else
+	{
+		Vin_reference_Q15 = 3276800; //100V
+	}
+	Previous_Power_Q15 = Input_Power_Q15;
 }
 
 interrupt void pwm_int()
@@ -237,6 +310,12 @@ void SetupAdc(void)
 	EDIS;
 }
 
+void initialize_mppt_timer(void)
+{
+	//Load the pre-scaler to 60000 clock cycles (1ms)
+	CpuTimer2Regs.TPR.bit.TDDR = 0xEA60;
+}
+
 void initVariables (void)
 {
 	rising_edge_delay = DB_RED;
@@ -251,9 +330,13 @@ void initVariables (void)
 	VIN_SCALE = 508;
 	VBUS_SCALE = 667;
 	I_SCALE = 150;
+	I_OFFSET = 0;
 	control_gain = 0x8000;
 	v_temporary = 0;
 	Vin_reference_Q15 = 0x8000;
-	Vin_reference_Q15 = -5*Vin_reference_Q15;
+	Vin_reference_Q15 = 100*Vin_reference_Q15;
+	Min_Startup_Voltage_Q15 = MIN_STARTUP_VOLTAGE;
+	Min_Operating_Voltage_Q15 = MIN_OPERATING_VOLTAGE;
+	startup_flag = 0;
 }
 
