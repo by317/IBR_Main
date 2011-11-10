@@ -4,7 +4,7 @@
 
 SHELL = cmd.exe
 
-CG_TOOL_ROOT := C:/Texas_Instruments/ccsv5/tools/compiler/c2000
+CG_TOOL_ROOT := C:/TI_Code_Composer_5_1/ccsv5/tools/compiler/c2000
 
 ORDERED_OBJS += \
 $(GEN_CMDS__FLAG) \
@@ -129,7 +129,7 @@ all: IBI.out
 IBI.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: C2000 Linker'
-	"C:/Texas_Instruments/ccsv5/tools/compiler/c2000/bin/cl2000" -v28 -mt -ml --symdebug:coff --diag_warning=225 --display_error_number --remove_hooks_when_inlining -z -m"IBI.map" --stack_size=0x300 --warn_sections -i"C:/Texas_Instruments/ccsv5/tools/compiler/c2000/lib" -i"C:/Texas_Instruments/ccsv5/tools/compiler/c2000/include" --reread_libs --rom_model -o "IBI.out" $(ORDERED_OBJS)
+	"C:/TI_Code_Composer_5_1/ccsv5/tools/compiler/c2000/bin/cl2000" -v28 -mt -ml --symdebug:coff --diag_warning=225 --display_error_number --remove_hooks_when_inlining -z -m"IBI.map" --stack_size=0x300 --warn_sections -i"C:/TI_Code_Composer_5_1/ccsv5/tools/compiler/c2000/lib" -i"C:/TI_Code_Composer_5_1/ccsv5/tools/compiler/c2000/include" --reread_libs --rom_model -o "IBI.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

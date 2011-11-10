@@ -52,6 +52,9 @@ long int Input_Power_Q15;
 int step_dir;
 int input_current_prescale;
 
+//System Status Variables
+unsigned int Power_Good;
+unsigned int Output_Over_Voltage;
 
 interrupt void pwm_int(void);
 interrupt void mppt_int(void);
@@ -128,6 +131,8 @@ void main()
 interrupt void mppt_int()
 {
 	GpioDataRegs.GPASET.bit.GPIO3 = 1;
+	Power_Good = GpioDataRegs.GPADAT.bit.GPIO16;
+	Output_Over_Voltage = GpioDataRegs.GPADAT.bit.GPIO17;
 	input_current_prescale = ((int) AdcResult.ADCRESULT2 - I_OFFSET);
 	Input_Current_Q15 = ((long int) (input_current_prescale )*I_SCALE);
 	Input_Power_Q15 = ((long long int) Input_Voltage_Q15*Input_Current_Q15 >> 15);
@@ -361,5 +366,7 @@ void initVariables (void)
 	input_current_prescale = 0;
 	VIN_OFFSET = VIN_OFFSET_INIT;
 	input_voltage_prescale = 0;
+	Power_Good = 0;
+	Output_Over_Voltage = 1;
 }
 
