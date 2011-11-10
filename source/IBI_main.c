@@ -16,8 +16,11 @@
 #define v_b1 -444
 #define v_b2 230
 
-#define MIN_OPERATING_VOLTAGE 491520; //Minimum Operating Voltage of 15V
+#define MIN_OPERATING_VOLTAGE 491520 //Minimum Operating Voltage of 15V
 #define MIN_STARTUP_VOLTAGE 655360 //Minimum Startup Voltage of 20V
+#define MAX_OPERATING_VOLTAGE 1474560 //Maximum Operating Voltage of 45V
+
+#define MPPT_UPDATE_PERIOD_MS	500
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
@@ -38,8 +41,12 @@ unsigned int step_direction;
 unsigned int startup_flag;
 long int Min_Startup_Voltage_Q15;
 long int Min_Operating_Voltage_Q15;
+long int Max_Operating_Voltage_Q15;
 long int Previous_Power_Q15;
-long int MPPT_Step_Size_Q15
+long int MPPT_Step_Size_Q15;
+long int Input_Power_Q15;
+int step_dir;
+
 
 interrupt void pwm_int(void);
 interrupt void mppt_int(void);
@@ -95,6 +102,7 @@ void main()
 	easyDSP_SCI_Init();
 	InitEPwm1();
 	pwm_setup();
+	initialize_mppt_timer();
 	InitEPwm1Gpio();
 	EALLOW;
 	PieVectTable.TINT2 = &mppt_int;
@@ -118,22 +126,23 @@ void main()
 
 interrupt void mppt_int()
 {
+	GpioDataRegs.GPASET.bit.GPIO3 = 1;
 	Input_Current_Q15 = ((long int) (AdcResult.ADCRESULT2 - I_OFFSET )*I_SCALE);
 	Input_Power_Q15 = ((long long int) Input_Voltage_Q15*Input_Current_Q15 >> 15);
 	if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
 	{
-		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size;
+		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size_Q15;
 		step_dir = 0;
 		startup_flag = 1;
 	}
-	else if (Input_Voltage_Q15 <= Min_Operating_Voltage)
+	else if (Input_Voltage_Q15 <= Min_Operating_Voltage_Q15)
 	{
-		Vin_reference_Q15 = Min_Operating_Voltage + MPPT_Step_Size;
+		Vin_reference_Q15 = Min_Operating_Voltage_Q15 + MPPT_Step_Size_Q15;
 		step_direction = 1;
 	}
-	else if (Input_Voltage_Q15 >= Max_Operating_Voltage)
+	else if (Input_Voltage_Q15 >= Max_Operating_Voltage_Q15)
 	{
-		Vin_reference_Q15 = Max_Operating_Voltage - MPPT_Step_Size;
+		Vin_reference_Q15 = Max_Operating_Voltage_Q15 - MPPT_Step_Size_Q15;
 		step_direction = 0;
 	}
 	else if (startup_flag)
@@ -142,11 +151,11 @@ interrupt void mppt_int()
 		{
 			if (step_direction)
 			{
-				Vin_reference_Q15 += MPPT_Step_Size;
+				Vin_reference_Q15 += MPPT_Step_Size_Q15;
 			}
 			else
 			{
-				Vin_reference_Q15 -= MPPT_Step_Size;
+				Vin_reference_Q15 -= MPPT_Step_Size_Q15;
 			}
 		}
 		else
@@ -154,12 +163,12 @@ interrupt void mppt_int()
 			if (step_direction)
 			{
 				step_direction = !step_direction;
-				Vin_reference_Q15 -= MPPT_Step_Size;
+				Vin_reference_Q15 -= MPPT_Step_Size_Q15;
 			}
 			else
 			{
 				step_direction = !step_direction;
-				Vin_reference_Q15 += MPPT_Step_Size;
+				Vin_reference_Q15 += MPPT_Step_Size_Q15;
 			}
 		}
 	}
@@ -168,12 +177,14 @@ interrupt void mppt_int()
 		Vin_reference_Q15 = 3276800; //100V
 	}
 	Previous_Power_Q15 = Input_Power_Q15;
+	GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
+	return;
 }
 
 interrupt void pwm_int()
 {
 	DINT;
-	GpioDataRegs.GPASET.bit.GPIO3 = 1;
+	//GpioDataRegs.GPASET.bit.GPIO3 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC0 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
@@ -222,7 +233,7 @@ interrupt void pwm_int()
 	duty = ((unsigned int) duty_output);
 
 	EPwm1Regs.CMPA.half.CMPA = duty;
-	GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
+	//GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
 	EINT;
 	EPwm1Regs.ETCLR.bit.INT = 0x1;  			//Clear the Interrupt Flag
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;  	//Acknowledge the interrupt
@@ -313,7 +324,10 @@ void SetupAdc(void)
 void initialize_mppt_timer(void)
 {
 	//Load the pre-scaler to 60000 clock cycles (1ms)
-	CpuTimer2Regs.TPR.bit.TDDR = 0xEA60;
+	CpuTimer2Regs.TPRH.all = 0x00EA;
+	CpuTimer2Regs.TPR.all = 0x0060;
+	CpuTimer2Regs.PRD.all = MPPT_UPDATE_PERIOD_MS;
+	CpuTimer2Regs.TCR.all = 0x4000; //Initialize to Interrupt Enabled and Free-Running
 }
 
 void initVariables (void)
@@ -337,6 +351,8 @@ void initVariables (void)
 	Vin_reference_Q15 = 100*Vin_reference_Q15;
 	Min_Startup_Voltage_Q15 = MIN_STARTUP_VOLTAGE;
 	Min_Operating_Voltage_Q15 = MIN_OPERATING_VOLTAGE;
+	Max_Operating_Voltage_Q15 = MAX_OPERATING_VOLTAGE;
 	startup_flag = 0;
+	step_dir = 0;
 }
 
