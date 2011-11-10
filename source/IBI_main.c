@@ -4,9 +4,10 @@
 #include "DSP2802x_GlobalPrototypes.h"
 #include "Piccolo_PWM.h"
 
-//#define VIN_SCALE	508		//Scaling for Q15 Format
-//#define VBUS_SCALE	508		//Scaling for Q15 Format
-//#define	I_SCALE		150		//Scaling for Q15 Format
+#define VIN_SCALE_INIT	508		//Scaling for Q15 Format
+#define VBUS_SCALE_INIT	667		//Scaling for Q15 Format
+#define	I_SCALE_INIT	147		//Scaling for Q15 Format
+#define I_OFFSET_INIT		114
 
 //#define v_b0 2418
 //#define v_b1 -4190
@@ -46,6 +47,7 @@ long int Previous_Power_Q15;
 long int MPPT_Step_Size_Q15;
 long int Input_Power_Q15;
 int step_dir;
+int input_current_prescale;
 
 
 interrupt void pwm_int(void);
@@ -127,7 +129,8 @@ void main()
 interrupt void mppt_int()
 {
 	GpioDataRegs.GPASET.bit.GPIO3 = 1;
-	Input_Current_Q15 = ((long int) (AdcResult.ADCRESULT2 - I_OFFSET )*I_SCALE);
+	input_current_prescale = ((int) AdcResult.ADCRESULT2 - I_OFFSET);
+	Input_Current_Q15 = ((long int) (input_current_prescale )*I_SCALE);
 	Input_Power_Q15 = ((long long int) Input_Voltage_Q15*Input_Current_Q15 >> 15);
 	if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
 	{
@@ -341,10 +344,10 @@ void initVariables (void)
 	Input_Voltage_Q15 = 0;
 	Bus_Voltage_Q15 = 0;
 	Input_Current_Q15 = 0;
-	VIN_SCALE = 508;
-	VBUS_SCALE = 667;
-	I_SCALE = 150;
-	I_OFFSET = 0;
+	VIN_SCALE = VIN_SCALE_INIT;
+	VBUS_SCALE = VBUS_SCALE_INIT;
+	I_SCALE = I_SCALE_INIT;
+	I_OFFSET = I_OFFSET_INIT;
 	control_gain = 0x8000;
 	v_temporary = 0;
 	Vin_reference_Q15 = 0x8000;
@@ -354,5 +357,6 @@ void initVariables (void)
 	Max_Operating_Voltage_Q15 = MAX_OPERATING_VOLTAGE;
 	startup_flag = 0;
 	step_dir = 0;
+	input_current_prescale = 0;
 }
 

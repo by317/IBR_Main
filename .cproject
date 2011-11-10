@@ -71,9 +71,6 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="com.ti.ccstudio.buildDefinitions.C2000.Debug.1602793740.F28027.cmd" name="F28027.cmd" rcbsApplicability="disable" resourcePath="F28027.cmd" toolsToInvoke="com.ti.ccstudio.buildDefinitions.C2000_6.0.exe.linkerDebug.815481139.146837950">
-						<tool id="com.ti.ccstudio.buildDefinitions.C2000_6.0.exe.linkerDebug.815481139.146837950" name="C2000 Linker" superClass="com.ti.ccstudio.buildDefinitions.C2000_6.0.exe.linkerDebug.815481139"/>
-					</fileInfo>
 					<sourceEntries>
 						<entry excluding="F28027.cmd" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
