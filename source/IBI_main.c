@@ -330,6 +330,7 @@ void initialize_mppt_timer(void)
 	CpuTimer2Regs.TPRH.all = 0x00EA;
 	CpuTimer2Regs.TPR.all = 0x0060;
 	CpuTimer2Regs.PRD.all = MPPT_UPDATE_PERIOD_MS;
+	CpuTimer2Regs.TCR.bit.TRB = 1;
 	CpuTimer2Regs.TCR.all = 0x4000; //Initialize to Interrupt Enabled and Free-Running
 }
 
