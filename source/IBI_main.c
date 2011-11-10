@@ -4,7 +4,8 @@
 #include "DSP2802x_GlobalPrototypes.h"
 #include "Piccolo_PWM.h"
 
-#define VIN_SCALE_INIT	508		//Scaling for Q15 Format
+#define VIN_SCALE_INIT	430		//Scaling for Q15 Format
+#define VIN_OFFSET_INIT 10
 #define VBUS_SCALE_INIT	667		//Scaling for Q15 Format
 #define	I_SCALE_INIT	147		//Scaling for Q15 Format
 #define I_OFFSET_INIT		114
@@ -36,6 +37,8 @@ unsigned int VIN_SCALE;
 unsigned int VBUS_SCALE;
 unsigned int I_SCALE;
 unsigned int I_OFFSET;
+unsigned int VIN_OFFSET;
+int input_voltage_prescale;
 
 //MPPT Variables
 unsigned int step_direction;
@@ -115,15 +118,11 @@ void main()
 	IER |= M_INT14;
 	EINT;
 	ERTM;
-//	for(;;)
-//	{
-////		EPwm1Regs.DBRED = rising_edge_delay;
-////		EPwm1Regs.DBFED = falling_edge_delay;
-////		EPwm1Regs.TBPRD = period;
-////
+	for(;;)
+	{
 ////		Bus_Voltage_Q15 = ((long int) AdcResult.ADCRESULT1*VBUS_SCALE);
-////		Input_Current_Q15 = ((long int) AdcResult.ADCRESULT2*I_SCALE);
-//	}
+
+	}
 }
 
 interrupt void mppt_int()
@@ -191,7 +190,8 @@ interrupt void pwm_int()
 	AdcRegs.ADCSOCFRC1.bit.SOC0 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
-	Input_Voltage_Q15 = ((long int) AdcResult.ADCRESULT0*VIN_SCALE);
+	input_voltage_prescale = ((int) AdcResult.ADCRESULT0 - VIN_OFFSET);
+	Input_Voltage_Q15 = ((long int) input_voltage_prescale*VIN_SCALE);
 	Vin_err_Q15 = Input_Voltage_Q15 - Vin_reference_Q15;
 	if (first_run)
 	{
@@ -358,5 +358,7 @@ void initVariables (void)
 	startup_flag = 0;
 	step_dir = 0;
 	input_current_prescale = 0;
+	VIN_OFFSET = VIN_OFFSET_INIT;
+	input_voltage_prescale = 0;
 }
 
