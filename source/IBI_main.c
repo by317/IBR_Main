@@ -255,6 +255,15 @@ void pwm_setup()
 	GpioCtrlRegs.GPADIR.bit.GPIO3 = 1;
 	EDIS;
 
+	EALLOW;
+	GpioCtrlRegs.GPAMUX2.bit.GPIO16 = 0x0;
+	GpioCtrlRegs.GPAMUX2.bit.GPIO17 = 0x0;
+	GpioCtrlRegs.GPADIR.bit.GPIO16 = 0;
+	GpioCtrlRegs.GPADIR.bit.GPIO17 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO16 = 1;
+	GpioCtrlRegs.GPAPUD.bit.GPIO17 = 1;
+	EDIS;
+
 	EPwm1Regs.ETSEL.bit.INTEN = 0x1;
 	EPwm1Regs.ETSEL.bit.INTSEL = 0x1;
 	EPwm1Regs.ETPS.bit.INTPRD = 0x1;	
