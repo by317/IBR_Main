@@ -3,6 +3,9 @@
 ################################################################################
 
 # Add inputs and outputs from these tool invocations to the build variables 
+LIB_SRCS += \
+../source/IQmath.lib 
+
 ASM_SRCS += \
 ../source/DSP2802x_CodeStartBranch.asm \
 ../source/DSP2802x_usDelay.asm 

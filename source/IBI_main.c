@@ -117,7 +117,8 @@ void main()
 	InitEPwm1();
 	pwm_setup();
 	initialize_mppt_timer();
-	InitEPwm1Gpio();
+	InitEPwm2Gpio();
+	InitEPwm3Gpio();
 	EALLOW;
 	PieVectTable.TINT2 = &mppt_int;
 	PieVectTable.EPWM2_INT = &pwm_int;
@@ -244,7 +245,7 @@ interrupt void pwm_int()
 	err_delay1 = Vin_err_Q15;
 
 	duty_output = ((long long int) v_comp_out >> 5);
-	duty = ((unsigned int) duty_output);
+	//duty = ((unsigned int) duty_output);
 
 	EPwm2Regs.CMPA.half.CMPA = duty - deadtime_after_Q1_off;
 	EPwm3Regs.CMPB = duty;

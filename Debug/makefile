@@ -21,6 +21,7 @@ $(GEN_CMDS__FLAG) \
 "./source/DSP2802x_DefaultIsr.obj" \
 "./source/DSP2802x_CodeStartBranch.obj" \
 -l"rts2800_ml.lib" \
+"../source/IQmath.lib" \
 "../DSP2802x_Headers_nonBIOS.cmd" \
 "../F28026.cmd" \
 
@@ -126,7 +127,7 @@ endif
 all: IBI.out
 
 # Tool invocations
-IBI.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
+IBI.out: $(OBJS) $(CMD_SRCS) $(LIB_SRCS) $(GEN_CMDS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: C2000 Linker'
 	"C:/Texas_Instruments/ccsv5/tools/compiler/c2000/bin/cl2000" -v28 -mt -ml --symdebug:coff --diag_warning=225 --display_error_number --remove_hooks_when_inlining -z -m"IBI.map" --stack_size=0x300 --warn_sections -i"C:/Texas_Instruments/ccsv5/tools/compiler/c2000/lib" -i"C:/Texas_Instruments/ccsv5/tools/compiler/c2000/include" --reread_libs --rom_model -o "IBI.out" $(ORDERED_OBJS)
