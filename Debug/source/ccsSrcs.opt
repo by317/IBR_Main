@@ -1,1 +1,0 @@
-"../source/DSP2802x_CodeStartBranch.asm" "../source/DSP2802x_DefaultIsr.c" "../source/DSP2802x_GlobalVariableDefs.c" "../source/DSP2802x_MemCopy.c" "../source/DSP2802x_PieCtrl.c" "../source/DSP2802x_PieVect.c" "../source/DSP2802x_SysCtrl.c" "../source/DSP2802x_usDelay.asm" "../source/IBI_main.c" "../source/Piccolo_PWM.c" "../source/RingBuff.c" "../source/easy2802x_sci_v7.3.c" 
