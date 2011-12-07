@@ -10,6 +10,7 @@
 #define	I_SCALE_INIT	147		//Scaling for Q15 Format
 #define I_OFFSET_INIT		114
 
+
 //#define v_b0 2418
 //#define v_b1 -4190
 //#define v_b2 1814
@@ -19,7 +20,10 @@
 #define v_b2 230
 
 #define INITIAL_DEADTIME_AFTER_Q1_OFF	0
-#define INITIAL_DEADTIME_AFTER_Q2_OFF	0
+#define INITIAL_DEADTIME_AFTER_Q2_OFF	1
+#define INITIAL_DEADTIME_AFTER_Q1_OFF_HI_RES	30
+#define INITIAL_DEADTIME_AFTER_Q2_OFF_HI_RES	30
+#define INITIAL_EARLY_TURN_ON_Q2	2
 
 #define MIN_OPERATING_VOLTAGE 491520 //Minimum Operating Voltage of 15V
 #define MIN_STARTUP_VOLTAGE 655360 //Minimum Startup Voltage of 20V
@@ -89,6 +93,9 @@ volatile long long int v_temporary;
 
 unsigned int deadtime_after_Q1_off;
 unsigned int deadtime_after_Q2_off;
+unsigned int deadtime_after_Q1_off_hi_res;
+unsigned int deadtime_after_Q2_off_hi_res;
+unsigned int early_turn_on_Q2;
 
 int32 Input_Voltage_Q15;
 int32 Bus_Voltage_Q15;
@@ -114,11 +121,10 @@ void main()
 	MemCopy(&RamfuncsLoadStart, &RamfuncsLoadEnd, &RamfuncsRunStart);
 	InitPieVectTable();
 	easyDSP_SCI_Init();
-	InitEPwm1();
+	InitEPwm2();
+	InitEPwm3();
 	pwm_setup();
 	initialize_mppt_timer();
-	InitEPwm2Gpio();
-	InitEPwm3Gpio();
 	EALLOW;
 	PieVectTable.TINT2 = &mppt_int;
 	PieVectTable.EPWM2_INT = &pwm_int;
@@ -127,6 +133,9 @@ void main()
 	IER |= M_INT3;
 	IER |= M_INT14;
 	EINT;
+	ms_delay(1);
+	InitEPwm2Gpio();
+	InitEPwm3Gpio();
 	ERTM;
 	for(;;)
 	{
@@ -248,8 +257,15 @@ interrupt void pwm_int()
 	//duty = ((unsigned int) duty_output);
 
 	EPwm2Regs.CMPA.half.CMPA = duty - deadtime_after_Q1_off;
-	EPwm3Regs.CMPB = duty;
+	EPwm2Regs.CMPA.half.CMPAHR = deadtime_after_Q1_off_hi_res << 8;
+
+	if (duty <= early_turn_on_Q2)
+	{
+		duty = early_turn_on_Q2;
+	}
+	EPwm3Regs.CMPB = duty + early_turn_on_Q2;
 	EPwm3Regs.CMPA.half.CMPA = deadtime_after_Q2_off;
+	EPwm3Regs.CMPA.half.CMPAHR = deadtime_after_Q2_off_hi_res << 8;
 	//GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
 	EINT;
 	EPwm2Regs.ETCLR.bit.INT = 0x1;  			//Clear the Interrupt Flag
@@ -273,9 +289,9 @@ void pwm_setup()
 	GpioCtrlRegs.GPAPUD.bit.GPIO17 = 1;
 	EDIS;
 
-	EPwm1Regs.ETSEL.bit.INTEN = 0x1;
-	EPwm1Regs.ETSEL.bit.INTSEL = 0x1;
-	EPwm1Regs.ETPS.bit.INTPRD = 0x1;	
+	EPwm2Regs.ETSEL.bit.INTEN = 0x1;
+	EPwm2Regs.ETSEL.bit.INTSEL = 0x1;
+	EPwm2Regs.ETPS.bit.INTPRD = 0x1;
 }
 
 void ms_delay(unsigned int wait_time)
@@ -386,5 +402,11 @@ void initVariables (void)
 	input_voltage_prescale = 0;
 	Power_Good = 0;
 	Output_Over_Voltage = 1;
+	deadtime_after_Q1_off = INITIAL_DEADTIME_AFTER_Q1_OFF;
+	deadtime_after_Q2_off = INITIAL_DEADTIME_AFTER_Q2_OFF;
+	deadtime_after_Q1_off_hi_res = INITIAL_DEADTIME_AFTER_Q1_OFF_HI_RES;
+	deadtime_after_Q2_off_hi_res = INITIAL_DEADTIME_AFTER_Q2_OFF_HI_RES;
+	early_turn_on_Q2 = INITIAL_EARLY_TURN_ON_Q2;
+	duty = INITIAL_EARLY_TURN_ON_Q2;
 }
 
