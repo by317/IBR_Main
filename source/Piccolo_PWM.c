@@ -43,7 +43,8 @@ void InitEPwm2()
 	EPwm2Regs.TBCTR = 0x0000;                      // Clear counter
 
    // Setup TBCLK
-	EPwm2Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
+	EPwm2Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP; // Count up
+	EPwm2Regs.TBCTL.bit.SYNCOSEL = TB_CTR_ZERO;
 	EPwm2Regs.TBCTL.bit.PHSEN = TB_DISABLE;        // Disable phase loading
 	EPwm2Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;       // Clock ratio to SYSCLKOUT
 	EPwm2Regs.TBCTL.bit.CLKDIV = TB_DIV1;
@@ -57,15 +58,15 @@ void InitEPwm2()
 	EPwm2Regs.CMPA.half.CMPA = 0;
 	
 	   // Set actions
-	EPwm2Regs.AQCTLA.bit.CAU = AQ_SET;             // Set PWM1A on Zero
+	EPwm2Regs.AQCTLA.bit.PRD = AQ_SET;             // Set PWM1A on Zero
 	EPwm2Regs.AQCTLA.bit.CAD = AQ_CLEAR;
 	
 	
-	EPwm2Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM1A on Zero
-	EPwm2Regs.AQCTLB.bit.CAD = AQ_SET;
+	EPwm2Regs.AQCTLB.bit.CAU = AQ_NO_ACTION;          // Set PWM1A on Zero
+	EPwm2Regs.AQCTLB.bit.CAD = AQ_NO_ACTION;
 
    // Active Low PWMs - Setup Deadband
-	EPwm2Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
+	EPwm2Regs.DBCTL.bit.OUT_MODE = DB_DISABLE;
 	EPwm2Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
 	EPwm2Regs.DBCTL.bit.IN_MODE = DBA_RED_DBB_FED;
 	EPwm2Regs.DBRED = DB_RED;
@@ -90,10 +91,11 @@ void InitEPwm3()
 	EPwm3Regs.CMPCTL.bit.LOADBMODE = CC_CTR_ZERO;
 
 	   // Setup compare
-	EPwm3Regs.CMPA.half.CMPA = 0;
+	EPwm3Regs.CMPA.half.CMPA = 1;
+	EPwm3Regs.CMPB = 0;
 	
 	   // Set actions
-	EPwm3Regs.AQCTLA.bit.CAU = AQ_SET;             // Set PWM1A on Zero
+	EPwm3Regs.AQCTLA.bit.CBD = AQ_SET;             // Set PWM1A on Zero
 	EPwm3Regs.AQCTLA.bit.CAD = AQ_CLEAR;
 	
 	
@@ -101,7 +103,7 @@ void InitEPwm3()
 	EPwm3Regs.AQCTLB.bit.CAD = AQ_SET;
 
    // Active Low PWMs - Setup Deadband
-	EPwm3Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
+	EPwm3Regs.DBCTL.bit.OUT_MODE = DB_DISABLE;
 	EPwm3Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;
 	EPwm3Regs.DBCTL.bit.IN_MODE = DBA_RED_DBB_FED;
 	EPwm3Regs.DBRED = DB_RED;

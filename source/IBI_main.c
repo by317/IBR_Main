@@ -18,6 +18,9 @@
 #define v_b1 -444
 #define v_b2 230
 
+#define INITIAL_DEADTIME_AFTER_Q1_OFF	0
+#define INITIAL_DEADTIME_AFTER_Q2_OFF	0
+
 #define MIN_OPERATING_VOLTAGE 491520 //Minimum Operating Voltage of 15V
 #define MIN_STARTUP_VOLTAGE 655360 //Minimum Startup Voltage of 20V
 #define MAX_OPERATING_VOLTAGE 1474560 //Maximum Operating Voltage of 45V
@@ -84,6 +87,9 @@ volatile long int Vin_err_Q15;
 volatile long int control_gain;
 volatile long long int v_temporary;
 
+unsigned int deadtime_after_Q1_off;
+unsigned int deadtime_after_Q2_off;
+
 int32 Input_Voltage_Q15;
 int32 Bus_Voltage_Q15;
 int32 Input_Current_Q15;
@@ -114,8 +120,8 @@ void main()
 	InitEPwm1Gpio();
 	EALLOW;
 	PieVectTable.TINT2 = &mppt_int;
-	PieVectTable.EPWM1_INT = &pwm_int;
-	PieCtrlRegs.PIEIER3.bit.INTx1 = 0x1;
+	PieVectTable.EPWM2_INT = &pwm_int;
+	PieCtrlRegs.PIEIER3.bit.INTx2 = 0x1;
 	EDIS;
 	IER |= M_INT3;
 	IER |= M_INT14;
@@ -240,10 +246,12 @@ interrupt void pwm_int()
 	duty_output = ((long long int) v_comp_out >> 5);
 	duty = ((unsigned int) duty_output);
 
-	EPwm1Regs.CMPA.half.CMPA = duty;
+	EPwm2Regs.CMPA.half.CMPA = duty - deadtime_after_Q1_off;
+	EPwm3Regs.CMPB = duty;
+	EPwm3Regs.CMPA.half.CMPA = deadtime_after_Q2_off;
 	//GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
 	EINT;
-	EPwm1Regs.ETCLR.bit.INT = 0x1;  			//Clear the Interrupt Flag
+	EPwm2Regs.ETCLR.bit.INT = 0x1;  			//Clear the Interrupt Flag
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;  	//Acknowledge the interrupt
 	return;
 }
