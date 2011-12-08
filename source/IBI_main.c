@@ -3,6 +3,7 @@
 #include "easy2802x_sci_v7.3.h"
 #include "DSP2802x_GlobalPrototypes.h"
 #include "Piccolo_PWM.h"
+#include "IQmathLib.h"
 
 #define VIN_SCALE_INIT	430		//Scaling for Q15 Format
 #define VIN_OFFSET_INIT 10
@@ -10,6 +11,7 @@
 #define	I_SCALE_INIT	147		//Scaling for Q15 Format
 #define I_OFFSET_INIT		114
 
+#define GLOBAL_Q	15
 
 //#define v_b0 2418
 //#define v_b1 -4190
@@ -30,6 +32,8 @@
 #define MAX_OPERATING_VOLTAGE 1474560 //Maximum Operating Voltage of 45V
 
 #define MPPT_UPDATE_PERIOD_MS	500
+#define MAX_POWER_SAMPLES		100
+#define INITIAL_POWER_SAMPLES	10
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
@@ -37,7 +41,11 @@
 
 #pragma CODE_SECTION(pwm_int, "ramfuncs");
 #pragma CODE_SECTION(mppt_int, "ramfuncs");
-
+#pragma CODE_SECTION(__IQmpy, "ramfuncs");
+#pragma CODE_SECTION(_IQ15int, "ramfuncs");
+#pragma CODE_SECTION(_IQ15frac, "ramfuncs");
+#pragma CODE_SECTION(__IQsat, "ramfuncs");
+#pragma CODE_SECTION(_IQ15div, "ramfuncs");
 
 //ADC Scaling/Offset Variables
 unsigned int VIN_SCALE;
@@ -97,6 +105,13 @@ unsigned int deadtime_after_Q1_off_hi_res;
 unsigned int deadtime_after_Q2_off_hi_res;
 unsigned int early_turn_on_Q2;
 
+long int Power_Samples_Q15[MAX_POWER_SAMPLES];
+unsigned int Num_Power_Samples;
+unsigned int Power_Sample_Counter;
+long int Power_Sample_Sum_Q15;
+
+unsigned int i;
+
 int32 Input_Voltage_Q15;
 int32 Bus_Voltage_Q15;
 int32 Input_Current_Q15;
@@ -149,9 +164,12 @@ interrupt void mppt_int()
 	GpioDataRegs.GPASET.bit.GPIO3 = 1;
 	Power_Good = GpioDataRegs.GPADAT.bit.GPIO16;
 	Output_Over_Voltage = GpioDataRegs.GPADAT.bit.GPIO17;
-	input_current_prescale = ((int) AdcResult.ADCRESULT2 - I_OFFSET);
-	Input_Current_Q15 = ((long int) (input_current_prescale )*I_SCALE);
-	Input_Power_Q15 = ((long long int) Input_Voltage_Q15*Input_Current_Q15 >> 15);
+	Power_Sample_Sum_Q15 = 0;
+	for (i = 0; i < Num_Power_Samples; i++)
+	{
+		Power_Sample_Sum_Q15 += Power_Samples_Q15[i];
+	}
+	Input_Power_Q15 = _IQ15div(Power_Sample_Sum_Q15, (Num_Power_Samples << 15));
 	if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
 	{
 		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size_Q15;
@@ -168,36 +186,39 @@ interrupt void mppt_int()
 		Vin_reference_Q15 = Max_Operating_Voltage_Q15 - MPPT_Step_Size_Q15;
 		step_direction = 0;
 	}
-	else if (startup_flag)
+	else
 	{
-		if (Input_Power_Q15 > Previous_Power_Q15)
+		if (startup_flag)
 		{
-			if (step_direction)
+			if (Input_Power_Q15 > Previous_Power_Q15)
 			{
-				Vin_reference_Q15 += MPPT_Step_Size_Q15;
+				if (step_direction)
+				{
+					Vin_reference_Q15 += MPPT_Step_Size_Q15;
+				}
+				else
+				{
+					Vin_reference_Q15 -= MPPT_Step_Size_Q15;
+				}
 			}
 			else
 			{
-				Vin_reference_Q15 -= MPPT_Step_Size_Q15;
+				if (step_direction)
+				{
+					step_direction = !step_direction;
+					Vin_reference_Q15 -= MPPT_Step_Size_Q15;
+				}
+				else
+				{
+					step_direction = !step_direction;
+					Vin_reference_Q15 += MPPT_Step_Size_Q15;
+				}
 			}
 		}
 		else
 		{
-			if (step_direction)
-			{
-				step_direction = !step_direction;
-				Vin_reference_Q15 -= MPPT_Step_Size_Q15;
-			}
-			else
-			{
-				step_direction = !step_direction;
-				Vin_reference_Q15 += MPPT_Step_Size_Q15;
-			}
+			Vin_reference_Q15 = 3276800; //100V
 		}
-	}
-	else
-	{
-		Vin_reference_Q15 = 3276800; //100V
 	}
 	Previous_Power_Q15 = Input_Power_Q15;
 	GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
@@ -213,6 +234,16 @@ interrupt void pwm_int()
 	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
 	input_voltage_prescale = ((int) AdcResult.ADCRESULT0 - VIN_OFFSET);
 	Input_Voltage_Q15 = ((long int) input_voltage_prescale*VIN_SCALE);
+	input_current_prescale = ((int) AdcResult.ADCRESULT2 - I_OFFSET);
+	Input_Current_Q15 = ((long int) (input_current_prescale )*I_SCALE);
+
+	if(Power_Sample_Counter >= Num_Power_Samples)
+	{
+		Power_Sample_Counter = 0;
+	}
+	Power_Samples_Q15[Power_Sample_Counter] = _IQmpy(Input_Voltage_Q15, Input_Current_Q15);
+	Power_Sample_Counter++;
+
 	Vin_err_Q15 = Input_Voltage_Q15 - Vin_reference_Q15;
 	if (first_run)
 	{
@@ -408,5 +439,12 @@ void initVariables (void)
 	deadtime_after_Q2_off_hi_res = INITIAL_DEADTIME_AFTER_Q2_OFF_HI_RES;
 	early_turn_on_Q2 = INITIAL_EARLY_TURN_ON_Q2;
 	duty = INITIAL_EARLY_TURN_ON_Q2;
+	Num_Power_Samples = INITIAL_POWER_SAMPLES;
+	for (i = 0; i < MAX_POWER_SAMPLES; i++)
+	{
+		Power_Samples_Q15[i] = 0;
+	}
+	Power_Sample_Counter = 0;
+	Power_Sample_Sum_Q15 = 0;
 }
 
