@@ -21,11 +21,11 @@
 #define v_b1 -444
 #define v_b2 230
 
-#define INITIAL_DEADTIME_AFTER_Q1_OFF	0
-#define INITIAL_DEADTIME_AFTER_Q2_OFF	1
-#define INITIAL_DEADTIME_AFTER_Q1_OFF_HI_RES	30
-#define INITIAL_DEADTIME_AFTER_Q2_OFF_HI_RES	30
-#define INITIAL_EARLY_TURN_ON_Q2	2
+#define INITIAL_DEADTIME_AFTER_Q1_OFF	5
+#define INITIAL_DEADTIME_AFTER_Q2_OFF	8
+#define INITIAL_DEADTIME_AFTER_Q1_OFF_HI_RES	0
+#define INITIAL_DEADTIME_AFTER_Q2_OFF_HI_RES	0
+#define INITIAL_EARLY_TURN_ON_Q2	0
 
 #define MIN_OPERATING_VOLTAGE 491520 //Minimum Operating Voltage of 15V
 #define MIN_STARTUP_VOLTAGE 655360 //Minimum Startup Voltage of 20V
@@ -34,6 +34,7 @@
 #define MPPT_UPDATE_PERIOD_MS	500
 #define MAX_POWER_SAMPLES		100
 #define INITIAL_POWER_SAMPLES	10
+#define INITIAL_MPPT_STEP_SIZE	_IQ15(0.5)
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
@@ -109,6 +110,7 @@ long int Power_Samples_Q15[MAX_POWER_SAMPLES];
 unsigned int Num_Power_Samples;
 unsigned int Power_Sample_Counter;
 long int Power_Sample_Sum_Q15;
+long int Num_Power_Samples_Q15;
 
 unsigned int i;
 
@@ -169,19 +171,20 @@ interrupt void mppt_int()
 	{
 		Power_Sample_Sum_Q15 += Power_Samples_Q15[i];
 	}
-	Input_Power_Q15 = _IQ15div(Power_Sample_Sum_Q15, (Num_Power_Samples << 15));
+	Num_Power_Samples_Q15 =  _IQ15(Num_Power_Samples);
+	Input_Power_Q15 = _IQ15div(Power_Sample_Sum_Q15, Num_Power_Samples_Q15);
 	if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
 	{
 		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size_Q15;
 		step_dir = 0;
 		startup_flag = 1;
 	}
-	else if (Input_Voltage_Q15 <= Min_Operating_Voltage_Q15)
+	else if (startup_flag && (Input_Voltage_Q15 <= Min_Operating_Voltage_Q15))
 	{
 		Vin_reference_Q15 = Min_Operating_Voltage_Q15 + MPPT_Step_Size_Q15;
 		step_direction = 1;
 	}
-	else if (Input_Voltage_Q15 >= Max_Operating_Voltage_Q15)
+	else if (startup_flag && (Input_Voltage_Q15 >= Max_Operating_Voltage_Q15))
 	{
 		Vin_reference_Q15 = Max_Operating_Voltage_Q15 - MPPT_Step_Size_Q15;
 		step_direction = 0;
@@ -285,16 +288,19 @@ interrupt void pwm_int()
 	err_delay1 = Vin_err_Q15;
 
 	duty_output = ((long long int) v_comp_out >> 5);
-	//duty = ((unsigned int) duty_output);
+	duty = ((unsigned int) duty_output);
 
-	EPwm2Regs.CMPA.half.CMPA = duty - deadtime_after_Q1_off;
+	EPwm2Regs.CMPA.half.CMPA = duty + deadtime_after_Q1_off;
 	EPwm2Regs.CMPA.half.CMPAHR = deadtime_after_Q1_off_hi_res << 8;
 
-	if (duty <= early_turn_on_Q2)
+	if (duty <= deadtime_after_Q2_off)
 	{
-		duty = early_turn_on_Q2;
+		EPwm3Regs.CMPB = deadtime_after_Q2_off + early_turn_on_Q2 + 1;
 	}
-	EPwm3Regs.CMPB = duty + early_turn_on_Q2;
+	else
+	{
+		EPwm3Regs.CMPB = duty + early_turn_on_Q2;
+	}
 	EPwm3Regs.CMPA.half.CMPA = deadtime_after_Q2_off;
 	EPwm3Regs.CMPA.half.CMPAHR = deadtime_after_Q2_off_hi_res << 8;
 	//GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
@@ -421,8 +427,8 @@ void initVariables (void)
 	I_OFFSET = I_OFFSET_INIT;
 	control_gain = 0x8000;
 	v_temporary = 0;
-	Vin_reference_Q15 = 0x8000;
-	Vin_reference_Q15 = 100*Vin_reference_Q15;
+	//Vin_reference_Q15 = 0x8000;
+	Vin_reference_Q15 = _IQ15(100);
 	Min_Startup_Voltage_Q15 = MIN_STARTUP_VOLTAGE;
 	Min_Operating_Voltage_Q15 = MIN_OPERATING_VOLTAGE;
 	Max_Operating_Voltage_Q15 = MAX_OPERATING_VOLTAGE;
@@ -446,5 +452,7 @@ void initVariables (void)
 	}
 	Power_Sample_Counter = 0;
 	Power_Sample_Sum_Q15 = 0;
+	MPPT_Step_Size_Q15 = INITIAL_MPPT_STEP_SIZE;
+	Num_Power_Samples_Q15 = _IQ15(Num_Power_Samples);
 }
 
