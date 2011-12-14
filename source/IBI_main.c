@@ -27,14 +27,18 @@
 #define INITIAL_DEADTIME_AFTER_Q2_OFF_HI_RES	0
 #define INITIAL_EARLY_TURN_ON_Q2	0
 
+
 #define MIN_OPERATING_VOLTAGE 491520 //Minimum Operating Voltage of 15V
 #define MIN_STARTUP_VOLTAGE 655360 //Minimum Startup Voltage of 20V
-#define MAX_OPERATING_VOLTAGE 1474560 //Maximum Operating Voltage of 45V
+//#define MAX_OPERATING_VOLTAGE 1474560 //Maximum Operating Voltage of 45V
 
 #define MPPT_UPDATE_PERIOD_MS	500
 #define MAX_POWER_SAMPLES		100
 #define INITIAL_POWER_SAMPLES	10
 #define INITIAL_MPPT_STEP_SIZE	_IQ15(0.5)
+#define INITIAL_HICCUP_CURRENT_LIMIT	0.5
+#define INITIAL_MAX_VOLTAGE		45
+#define INITIAL_MAX_OPERATING_VOLTAGE	40
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
@@ -42,6 +46,7 @@
 
 #pragma CODE_SECTION(pwm_int, "ramfuncs");
 #pragma CODE_SECTION(mppt_int, "ramfuncs");
+#pragma CODE_SECTION(ms_delay, "ramfuncs");
 #pragma CODE_SECTION(__IQmpy, "ramfuncs");
 #pragma CODE_SECTION(_IQ15int, "ramfuncs");
 #pragma CODE_SECTION(_IQ15frac, "ramfuncs");
@@ -60,11 +65,13 @@ int input_voltage_prescale;
 unsigned int step_direction;
 unsigned int startup_flag;
 long int Min_Startup_Voltage_Q15;
+long int Max_Voltage_Q15;
 long int Min_Operating_Voltage_Q15;
 long int Max_Operating_Voltage_Q15;
 long int Previous_Power_Q15;
 long int MPPT_Step_Size_Q15;
 long int Input_Power_Q15;
+long int Hiccup_Current_Limit_Q15;
 int step_dir;
 int input_current_prescale;
 
@@ -173,10 +180,16 @@ interrupt void mppt_int()
 	}
 	Num_Power_Samples_Q15 =  _IQ15(Num_Power_Samples);
 	Input_Power_Q15 = _IQ15div(Power_Sample_Sum_Q15, Num_Power_Samples_Q15);
-	if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
+	if (Input_Voltage_Q15 > Max_Voltage_Q15 || Output_Over_Voltage)
+	{
+		Vin_reference_Q15 = 3276800; //100V
+		startup_flag = 0;
+		ms_delay(10000);
+	}
+	else if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
 	{
 		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size_Q15;
-		step_dir = 0;
+		step_direction = 0;
 		startup_flag = 1;
 	}
 	else if (startup_flag && (Input_Voltage_Q15 <= Min_Operating_Voltage_Q15))
@@ -239,7 +252,13 @@ interrupt void pwm_int()
 	Input_Voltage_Q15 = ((long int) input_voltage_prescale*VIN_SCALE);
 	input_current_prescale = ((int) AdcResult.ADCRESULT2 - I_OFFSET);
 	Input_Current_Q15 = ((long int) (input_current_prescale )*I_SCALE);
-
+	if (!Power_Good)
+	{
+		if (Input_Current_Q15 > Hiccup_Current_Limit_Q15)
+		{
+			Vin_reference_Q15 = 3276800;
+		}
+	}
 	if(Power_Sample_Counter >= Num_Power_Samples)
 	{
 		Power_Sample_Counter = 0;
@@ -431,7 +450,8 @@ void initVariables (void)
 	Vin_reference_Q15 = _IQ15(100);
 	Min_Startup_Voltage_Q15 = MIN_STARTUP_VOLTAGE;
 	Min_Operating_Voltage_Q15 = MIN_OPERATING_VOLTAGE;
-	Max_Operating_Voltage_Q15 = MAX_OPERATING_VOLTAGE;
+	Max_Operating_Voltage_Q15 = _IQ15(INITIAL_MAX_OPERATING_VOLTAGE);
+	Max_Voltage_Q15 = _IQ15(INITIAL_MAX_VOLTAGE);
 	startup_flag = 0;
 	step_dir = 0;
 	input_current_prescale = 0;
@@ -454,5 +474,6 @@ void initVariables (void)
 	Power_Sample_Sum_Q15 = 0;
 	MPPT_Step_Size_Q15 = INITIAL_MPPT_STEP_SIZE;
 	Num_Power_Samples_Q15 = _IQ15(Num_Power_Samples);
+	Hiccup_Current_Limit_Q15 = _IQ15(INITIAL_HICCUP_CURRENT_LIMIT);
 }
 
