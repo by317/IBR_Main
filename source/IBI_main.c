@@ -41,6 +41,11 @@
 #define INITIAL_MAX_VOLTAGE		45
 #define INITIAL_MAX_OPERATING_VOLTAGE	40
 
+#define DUTY_KNEE	3277
+#define DUTY_CROSSOVER	16384
+#define TMAX	3600
+#define MIN_ON	360
+
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
 #define DELAY_MIN -45876 //(-1.4)
@@ -109,6 +114,7 @@ volatile long int Vin_err_Q15;
 volatile long int control_gain;
 volatile long long int v_temporary;
 long int High_Voltage_Reference_Q15;
+volatile long int duty_comp;
 
 unsigned int deadtime_after_Q1_off;
 unsigned int deadtime_after_Q2_off;
@@ -321,26 +327,44 @@ interrupt void pwm_int()
 		out_delay1 = DELAY_MAX;
 	}
 
-
 	err_delay2 = err_delay1;
 	err_delay1 = Vin_err_Q15;
 
-	duty_output = ((long long int) v_comp_out >> 5);
-	duty = ((unsigned int) duty_output);
+	//duty_comp = v_comp_out;
 
-	EPwm2Regs.CMPA.half.CMPA = duty + deadtime_after_Q1_off;
-	EPwm2Regs.CMPA.half.CMPAHR = deadtime_after_Q1_off_hi_res << 8;
-
-	if (duty <= deadtime_after_Q2_off)
+	if (duty_comp <= DUTY_KNEE)
 	{
-		EPwm3Regs.CMPB = deadtime_after_Q2_off + early_turn_on_Q2 + 1;
+		EPwm2Regs.TBPRD = TMAX;
+		EPwm3Regs.TBPRD = TMAX;
+		duty_output = _IQmpy(duty_comp, TMAX);
+		duty = ((unsigned int) duty_output);
+		EPwm2Regs.CMPA.half.CMPA = duty + deadtime_after_Q1_off;
+		EPwm3Regs.CMPB = duty;
+	}
+	else if(duty_comp <= DUTY_CROSSOVER)
+	{
+		EPwm2Regs.TBPRD = _IQ15div(MIN_ON, duty_comp);
+		EPwm3Regs.TBPRD = EPwm2Regs.TBPRD;
+		duty_output = MIN_ON;
+		duty = MIN_ON;
+		EPwm2Regs.CMPA.half.CMPA = duty + deadtime_after_Q1_off;
+		EPwm3Regs.CMPB = duty;
 	}
 	else
 	{
-		EPwm3Regs.CMPB = duty + early_turn_on_Q2;
+		EPwm2Regs.TBPRD = _IQ15div(MIN_ON, (32768 - duty_comp));
+		EPwm3Regs.TBPRD = EPwm2Regs.TBPRD;
+		duty_output = EPwm2Regs.TBPRD - MIN_ON;
+		duty = ((unsigned int) duty_output);
+		EPwm2Regs.CMPA.half.CMPA = duty + deadtime_after_Q1_off;
+		EPwm3Regs.CMPB = duty;
+	}
+	if (EPwm3Regs.CMPB <= deadtime_after_Q2_off)
+	{
+		EPwm3Regs.CMPB = deadtime_after_Q2_off + 1;
 	}
 	EPwm3Regs.CMPA.half.CMPA = deadtime_after_Q2_off;
-	EPwm3Regs.CMPA.half.CMPAHR = deadtime_after_Q2_off_hi_res << 8;
+
 	//GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
 	EINT;
 	EPwm2Regs.ETCLR.bit.INT = 0x1;  			//Clear the Interrupt Flag
@@ -497,5 +521,6 @@ void initVariables (void)
 	High_Voltage_Reference_Q15 = _IQ15(100);
 	delay_flag = 0;
 	Current_Limit_Q15 = _IQ15(INITIAL_CURRENT_LIMIT);
+	duty_comp = 0;
 }
 
