@@ -37,7 +37,7 @@
 #define MAX_POWER_SAMPLES		100
 #define INITIAL_POWER_SAMPLES	10
 #define INITIAL_MPPT_STEP_SIZE	_IQ15(0.5)
-#define INITIAL_HICCUP_CURRENT_LIMIT	0.5
+#define INITIAL_HICCUP_CURRENT_LIMIT	1.5
 #define INITIAL_MAX_VOLTAGE		45
 #define INITIAL_MAX_OPERATING_VOLTAGE	40
 
@@ -179,8 +179,6 @@ void main()
 interrupt void mppt_int()
 {
 	GpioDataRegs.GPASET.bit.GPIO3 = 1;
-	Power_Good = GpioDataRegs.GPADAT.bit.GPIO16;
-	Output_Over_Voltage = GpioDataRegs.GPADAT.bit.GPIO17;
 	Power_Sample_Sum_Q15 = 0;
 	for (i = 0; i < Num_Power_Samples; i++)
 	{
@@ -188,13 +186,7 @@ interrupt void mppt_int()
 	}
 	Num_Power_Samples_Q15 =  _IQ15(Num_Power_Samples);
 	Input_Power_Q15 = _IQ15div(Power_Sample_Sum_Q15, Num_Power_Samples_Q15);
-	if (Input_Voltage_Q15 > Max_Voltage_Q15 || Output_Over_Voltage)
-	{
-		Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
-		startup_flag = 0;
-		delay_flag = 1;
-	}
-	else if (delay_flag)
+	if (delay_flag)
 	{
 		Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
 		startup_flag = 0;
@@ -261,6 +253,14 @@ interrupt void pwm_int()
 	AdcRegs.ADCSOCFRC1.bit.SOC0 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
+	Power_Good = GpioDataRegs.GPADAT.bit.GPIO16;
+	Output_Over_Voltage = GpioDataRegs.GPADAT.bit.GPIO17;
+	if (Input_Voltage_Q15 > Max_Voltage_Q15 || Output_Over_Voltage)
+		{
+			Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
+			startup_flag = 0;
+			delay_flag = 1;
+		}
 	input_voltage_prescale = ((int) AdcResult.ADCRESULT0 - VIN_OFFSET);
 	Input_Voltage_Q15 = ((long int) input_voltage_prescale*VIN_SCALE);
 	input_current_prescale = ((int) AdcResult.ADCRESULT2 - I_OFFSET);
