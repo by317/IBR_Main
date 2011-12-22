@@ -41,9 +41,7 @@
 #define INITIAL_MAX_VOLTAGE		45
 #define INITIAL_MAX_OPERATING_VOLTAGE	40
 
-#define DUTY_KNEE	3277
-#define DUTY_CROSSOVER	16384
-#define TMAX	3600
+#define TMAX	3000
 #define MIN_ON	360
 
 #define OUT_MAX 0x599A
@@ -123,11 +121,13 @@ unsigned int deadtime_after_Q2_off_hi_res;
 unsigned int early_turn_on_Q2;
 
 long int Power_Samples_Q15[MAX_POWER_SAMPLES];
+unsigned int Period_Table[2][1001];
 unsigned int Num_Power_Samples;
 unsigned int Power_Sample_Counter;
 long int Power_Sample_Sum_Q15;
 long int Num_Power_Samples_Q15;
 unsigned int delay_flag;
+unsigned int duty_knee;
 
 unsigned int i;
 
@@ -139,6 +139,7 @@ void ms_delay(unsigned int);
 void SetupAdc(void);
 void initVariables(void);
 void initialize_mppt_timer(void);
+void initialize_Period_Table(void);
 
 void main()
 {
@@ -330,40 +331,21 @@ interrupt void pwm_int()
 	err_delay2 = err_delay1;
 	err_delay1 = Vin_err_Q15;
 
-	//duty_comp = v_comp_out;
+	duty_output = ((long long int) v_comp_out >> 5);
+	//duty = ((unsigned int) duty_output);
 
-	if (duty_comp <= DUTY_KNEE)
-	{
-		EPwm2Regs.TBPRD = TMAX;
-		EPwm3Regs.TBPRD = TMAX;
-		duty_output = _IQmpy(duty_comp, TMAX);
-		duty = ((unsigned int) duty_output);
-		EPwm2Regs.CMPA.half.CMPA = duty + deadtime_after_Q1_off;
-		EPwm3Regs.CMPB = duty;
-	}
-	else if(duty_comp <= DUTY_CROSSOVER)
-	{
-		EPwm2Regs.TBPRD = _IQ15div(MIN_ON, duty_comp);
-		EPwm3Regs.TBPRD = EPwm2Regs.TBPRD;
-		duty_output = MIN_ON;
-		duty = MIN_ON;
-		EPwm2Regs.CMPA.half.CMPA = duty + deadtime_after_Q1_off;
-		EPwm3Regs.CMPB = duty;
-	}
-	else
-	{
-		EPwm2Regs.TBPRD = _IQ15div(MIN_ON, (32768 - duty_comp));
-		EPwm3Regs.TBPRD = EPwm2Regs.TBPRD;
-		duty_output = EPwm2Regs.TBPRD - MIN_ON;
-		duty = ((unsigned int) duty_output);
-		EPwm2Regs.CMPA.half.CMPA = duty + deadtime_after_Q1_off;
-		EPwm3Regs.CMPB = duty;
-	}
+	EPwm2Regs.TBPRD = Period_Table[0][duty];
+	EPwm3Regs.TBPRD = Period_Table[0][duty];
+
+	EPwm2Regs.CMPA.half.CMPA = Period_Table[1][duty] + deadtime_after_Q1_off;
+	EPwm3Regs.CMPB = Period_Table[1][duty];
+
 	if (EPwm3Regs.CMPB <= deadtime_after_Q2_off)
 	{
 		EPwm3Regs.CMPB = deadtime_after_Q2_off + 1;
 	}
 	EPwm3Regs.CMPA.half.CMPA = deadtime_after_Q2_off;
+
 
 	//GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
 	EINT;
@@ -522,5 +504,43 @@ void initVariables (void)
 	delay_flag = 0;
 	Current_Limit_Q15 = _IQ15(INITIAL_CURRENT_LIMIT);
 	duty_comp = 0;
+	initialize_Period_Table();
 }
 
+void initialize_Period_Table(void)
+{
+	long int temp = ((long int) MIN_ON*1000)/TMAX;
+	duty_knee = ((unsigned int) temp);
+	int k;
+	for (k = 0; k <= 1000; k++)
+	{
+		if (k == 0)
+		{
+			Period_Table[0][k] = TMAX;
+			Period_Table[1][k] = 0;
+		}
+		else if (k <= duty_knee)
+		{
+			Period_Table[0][k] = TMAX;
+			temp = ((long int) k)*((long int) TMAX)/1000;
+			Period_Table[1][k] = temp;
+		}
+		else if (k <= 500)
+		{
+			Period_Table[0][k] = ((long int) MIN_ON*1000)/k;
+			Period_Table[1][k] = MIN_ON;
+		}
+		else if (k <= (1000 - duty_knee))
+		{
+			Period_Table[0][k] = ((long int) MIN_ON*1000)/(1000 - k);
+			Period_Table[1][k] = Period_Table[0][k] - MIN_ON;
+		}
+		else
+		{
+			Period_Table[0][k] = TMAX;
+			temp = ((long int) k)*((long int) TMAX)/1000;
+			Period_Table[1][k] = temp;
+			//Period_Table[1][k] = TMAX - Period_Table[1][k];
+		}
+	}
+}
