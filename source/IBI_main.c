@@ -42,7 +42,7 @@
 #define INITIAL_MAX_OPERATING_VOLTAGE	40
 
 #define TMAX	3000
-#define MIN_ON	360
+#define MIN_ON	500
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
