@@ -63,6 +63,11 @@ extern void DSP28x_usDelay(Uint32);
 void ms_delay(unsigned int);
 void SetupAdc(void);
 void initVariables(void);
+unsigned int Period;
+unsigned int Q1_Pulse_Length;
+unsigned int Q2_Pulse_Length;
+unsigned int Rising_Edge_Deadtime;
+unsigned int Falling_Edge_Deadtime;
 
 void main()
 {
@@ -80,11 +85,18 @@ void main()
 	InitPieVectTable();
 	easyDSP_SCI_Init();
 	InitEPwm1();
+	InitEPwm2();
 	pwm_setup();
 	InitEPwm1Gpio();
+	InitEPwm2Gpio();
 	EALLOW;
 	PieVectTable.EPWM1_INT = &pwm_int;
 	PieCtrlRegs.PIEIER3.bit.INTx1 = 0x1;
+	//EPwm1Regs.TBPRD = 870;
+	Falling_Edge_Deadtime = 7;
+	Q1_Pulse_Length = 72;
+	Q2_Pulse_Length = 480;
+	Period = 870;
 	EDIS;
 	IER |= M_INT3;
 	EINT;
@@ -98,12 +110,13 @@ void main()
 ////		Bus_Voltage_Q15 = ((long int) AdcResult.ADCRESULT1*VBUS_SCALE);
 ////		Input_Current_Q15 = ((long int) AdcResult.ADCRESULT2*I_SCALE);
 //	}
+
 }
 
 interrupt void pwm_int()
 {
 	DINT;
-	GpioDataRegs.GPASET.bit.GPIO3 = 1;
+	//GpioDataRegs.GPASET.bit.GPIO3 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC0 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
 	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
@@ -148,11 +161,22 @@ interrupt void pwm_int()
 	err_delay2 = err_delay1;
 	err_delay1 = Vin_err_Q15;
 
-	duty_output = ((long long int) v_comp_out >> 5);
-	duty = ((unsigned int) duty_output);
+	EPwm1Regs.TBPRD = Period;
+	EPwm2Regs.TBPRD = Period;
 
-	EPwm1Regs.CMPA.half.CMPA = duty;
-	GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
+	EPwm1Regs.CMPA.half.CMPA = Q1_Pulse_Length;
+
+	EPwm2Regs.CMPA.half.CMPA = Q1_Pulse_Length + Falling_Edge_Deadtime;
+	EPwm2Regs.CMPB = EPwm2Regs.CMPA.half.CMPA + Q2_Pulse_Length;
+
+	//EPwm1Regs.DBRED = Rising_Edge_Deadtime;
+	//EPwm1Regs.DBFED = Falling_Edge_Deadtime;
+
+	duty_output = ((long long int) v_comp_out >> 5);
+	//duty = ((unsigned int) duty_output);
+
+	//EPwm1Regs.CMPA.half.CMPA = duty;
+	//GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
 	EINT;
 	EPwm1Regs.ETCLR.bit.INT = 0x1;  			//Clear the Interrupt Flag
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;  	//Acknowledge the interrupt
@@ -161,10 +185,10 @@ interrupt void pwm_int()
 
 void pwm_setup()
 {
-	EALLOW;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO3 = 0x0;
-	GpioCtrlRegs.GPADIR.bit.GPIO3 = 1;
-	EDIS;
+	//EALLOW;
+	//GpioCtrlRegs.GPAMUX1.bit.GPIO3 = 0x0;
+	//GpioCtrlRegs.GPADIR.bit.GPIO3 = 1;
+	//EDIS;
 
 	EPwm1Regs.ETSEL.bit.INTEN = 0x1;
 	EPwm1Regs.ETSEL.bit.INTSEL = 0x1;
