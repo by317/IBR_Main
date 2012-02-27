@@ -283,9 +283,9 @@ void InitPeripheralClocks(void)
    SysCtrlRegs.PCLKCR1.bit.EPWM1ENCLK = 1;     // EPWM1
    SysCtrlRegs.PCLKCR1.bit.EPWM2ENCLK = 1;     // EPWM2
    SysCtrlRegs.PCLKCR1.bit.EPWM3ENCLK = 1;     // EPWM3
-   SysCtrlRegs.PCLKCR1.bit.EPWM4ENCLK = 1;     // EPWM4
+   SysCtrlRegs.PCLKCR1.bit.EPWM4ENCLK = 0;     // EPWM4
    SysCtrlRegs.PCLKCR3.bit.GPIOINENCLK = 1;    // GPIO
-   SysCtrlRegs.PCLKCR0.bit.HRPWMENCLK=1;       // HRPWM
+   SysCtrlRegs.PCLKCR0.bit.HRPWMENCLK=0;       // HRPWM
    SysCtrlRegs.PCLKCR0.bit.I2CAENCLK = 0;      // I2C
    SysCtrlRegs.PCLKCR0.bit.SCIAENCLK = 1;      // SCI-A
    SysCtrlRegs.PCLKCR0.bit.SPIAENCLK = 0;      // SPI-A

@@ -8,8 +8,9 @@
 #define VIN_SCALE_INIT	430		//Scaling for Q15 Format
 #define VIN_OFFSET_INIT 10
 #define VBUS_SCALE_INIT	667		//Scaling for Q15 Format
-#define	I_SCALE_INIT	147		//Scaling for Q15 Format
-#define I_OFFSET_INIT		114
+#define	I_SCALE_INIT	100		//Scaling for Q15 Format
+#define I_OFFSET_INIT		47
+
 
 #define GLOBAL_Q	15
 
@@ -33,7 +34,7 @@
 //#define MAX_OPERATING_VOLTAGE 1474560 //Maximum Operating Voltage of 45V
 #define INITIAL_CURRENT_LIMIT	13
 
-#define MPPT_UPDATE_PERIOD_MS	500
+#define MPPT_UPDATE_PERIOD_MS	2000
 #define MAX_POWER_SAMPLES		100
 #define INITIAL_POWER_SAMPLES	10
 #define INITIAL_MPPT_STEP_SIZE	_IQ15(0.5)
@@ -41,8 +42,8 @@
 #define INITIAL_MAX_VOLTAGE		45
 #define INITIAL_MAX_OPERATING_VOLTAGE	40
 
-#define TMAX	3000
-#define MIN_ON	500
+#define TMAX	20000
+#define MIN_ON	400
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
@@ -129,7 +130,11 @@ long int Num_Power_Samples_Q15;
 unsigned int delay_flag;
 unsigned int duty_knee;
 
+int i_sense_v_gain;
+int i_sense_v_shift;
+
 unsigned int i;
+unsigned int Sample_Advance;
 
 int32 Input_Voltage_Q15;
 int32 Bus_Voltage_Q15;
@@ -186,7 +191,8 @@ void main()
 interrupt void mppt_int()
 {
 	GpioDataRegs.GPASET.bit.GPIO3 = 1;
-	Power_Good = GpioDataRegs.GPADAT.bit.GPIO16;
+	//Power_Good = GpioDataRegs.GPADAT.bit.GPIO16;
+	Power_Good = 1;
 	Output_Over_Voltage = GpioDataRegs.GPADAT.bit.GPIO17;
 	Power_Sample_Sum_Q15 = 0;
 	for (i = 0; i < Num_Power_Samples; i++)
@@ -265,12 +271,12 @@ interrupt void pwm_int()
 {
 	DINT;
 	//GpioDataRegs.GPASET.bit.GPIO3 = 1;
-	AdcRegs.ADCSOCFRC1.bit.SOC0 = 1;
-	AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
-	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
+	//AdcRegs.ADCSOCFRC1.bit.SOC0 = 1;
+	//AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
+	//AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
 	input_voltage_prescale = ((int) AdcResult.ADCRESULT0 - VIN_OFFSET);
 	Input_Voltage_Q15 = ((long int) input_voltage_prescale*VIN_SCALE);
-	input_current_prescale = ((int) AdcResult.ADCRESULT2 - I_OFFSET);
+	input_current_prescale = ((int) AdcResult.ADCRESULT1 - I_OFFSET) - ((input_voltage_prescale*i_sense_v_gain) >> i_sense_v_shift);
 	Input_Current_Q15 = ((long int) (input_current_prescale )*I_SCALE);
 	if (!Power_Good)
 	{
@@ -338,6 +344,7 @@ interrupt void pwm_int()
 	EPwm3Regs.TBPRD = Period_Table[0][duty];
 
 	EPwm2Regs.CMPA.half.CMPA = Period_Table[1][duty] + deadtime_after_Q1_off;
+	EPwm2Regs.CMPB = EPwm2Regs.TBPRD - (EPwm2Regs.CMPA.half.CMPA >> 1) + Sample_Advance;
 	EPwm3Regs.CMPB = Period_Table[1][duty];
 
 	if (EPwm3Regs.CMPB <= deadtime_after_Q2_off)
@@ -373,6 +380,9 @@ void pwm_setup()
 	EPwm2Regs.ETSEL.bit.INTEN = 0x1;
 	EPwm2Regs.ETSEL.bit.INTSEL = 0x1;
 	EPwm2Regs.ETPS.bit.INTPRD = 0x1;
+	EPwm2Regs.ETSEL.bit.SOCAEN = 1;
+	EPwm2Regs.ETSEL.bit.SOCASEL = ET_CTRD_CMPB;
+	EPwm2Regs.ETPS.bit.SOCAPRD = 0x1;
 }
 
 void ms_delay(unsigned int wait_time)
@@ -429,18 +439,19 @@ void InitAdc(void)
 void SetupAdc(void)
 {
 	EALLOW;
+	AdcRegs.ADCSAMPLEMODE.bit.SIMULEN0 = 1;
 	//Input Voltage Sampling on SOC0
-	AdcRegs.ADCSOC0CTL.bit.TRIGSEL = 0x00;
+	AdcRegs.ADCSOC0CTL.bit.TRIGSEL = 0x07;
 	AdcRegs.ADCSOC0CTL.bit.CHSEL = 0x2;
 	AdcRegs.ADCSOC0CTL.bit.ACQPS = 0x6;	
 	//Output Voltage Sampling on SOC1
-	AdcRegs.ADCSOC1CTL.bit.TRIGSEL = 0x00;
-	AdcRegs.ADCSOC1CTL.bit.CHSEL = 0x0;
-	AdcRegs.ADCSOC1CTL.bit.ACQPS = 0x6;	
-	//Input Current Sampling on SOC4
-	AdcRegs.ADCSOC2CTL.bit.TRIGSEL = 0x00;
-	AdcRegs.ADCSOC2CTL.bit.CHSEL = 0x4;
-	AdcRegs.ADCSOC2CTL.bit.ACQPS = 0x6;
+//	AdcRegs.ADCSOC1CTL.bit.TRIGSEL = 0x00;
+//	AdcRegs.ADCSOC1CTL.bit.CHSEL = 0x0;
+//	AdcRegs.ADCSOC1CTL.bit.ACQPS = 0x6;
+//	//Input Current Sampling on SOC4
+//	AdcRegs.ADCSOC2CTL.bit.TRIGSEL = 0x00;
+//	AdcRegs.ADCSOC2CTL.bit.CHSEL = 0x4;
+//	AdcRegs.ADCSOC2CTL.bit.ACQPS = 0x6;
 	EDIS;
 }
 
@@ -505,6 +516,9 @@ void initVariables (void)
 	Current_Limit_Q15 = _IQ15(INITIAL_CURRENT_LIMIT);
 	duty_comp = 0;
 	initialize_Period_Table();
+	Sample_Advance = 0;
+	i_sense_v_gain = 0;
+	i_sense_v_shift = 0;
 }
 
 void initialize_Period_Table(void)

@@ -77,6 +77,7 @@ void InitEPwm2()
 	EPwm2Regs.DBCTL.bit.IN_MODE = DBA_RED_DBB_FED;
 	EPwm2Regs.DBRED = DB_RED;
 	EPwm2Regs.DBFED = DB_FED;
+
 }
 
 void InitEPwm3()
