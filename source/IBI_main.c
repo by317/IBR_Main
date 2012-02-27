@@ -43,10 +43,10 @@
 #define INITIAL_MAX_VOLTAGE		45
 #define INITIAL_MAX_OPERATING_VOLTAGE	40
 
-#define TMAX	2400
+#define TMAX	800
 #define MIN_ON	40000
 
-#define OUT_MAX 0x599A
+#define OUT_MAX 22000
 #define DELAY_MAX 45876 //(+1.4)
 #define DELAY_MIN -45876 //(-1.4)
 
@@ -199,74 +199,6 @@ interrupt void mppt_int()
 	//Power_Good = GpioDataRegs.GPADAT.bit.GPIO16;
 	Power_Good = 1;
 	Output_Over_Voltage = GpioDataRegs.GPADAT.bit.GPIO17;
-	Power_Sample_Sum_Q15 = 0;
-	for (i = 0; i < Num_Power_Samples; i++)
-	{
-		Power_Sample_Sum_Q15 += Power_Samples_Q15[i];
-	}
-	Num_Power_Samples_Q15 =  _IQ15(Num_Power_Samples);
-	Input_Power_Q15 = _IQ15div(Power_Sample_Sum_Q15, Num_Power_Samples_Q15);
-	if (Input_Voltage_Q15 > Max_Voltage_Q15 || Output_Over_Voltage)
-	{
-		Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
-		startup_flag = 0;
-		delay_flag = 1;
-	}
-	else if (delay_flag)
-	{
-		Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
-		startup_flag = 0;
-	}
-	else if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
-	{
-		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size_Q15;
-		step_direction = 0;
-		startup_flag = 1;
-	}
-	else if (startup_flag && (Input_Voltage_Q15 <= Min_Operating_Voltage_Q15))
-	{
-		Vin_reference_Q15 = Min_Operating_Voltage_Q15 + MPPT_Step_Size_Q15;
-		step_direction = 1;
-	}
-	else if (startup_flag && (Input_Voltage_Q15 >= Max_Operating_Voltage_Q15))
-	{
-		Vin_reference_Q15 = Max_Operating_Voltage_Q15 - MPPT_Step_Size_Q15;
-		step_direction = 0;
-	}
-	else
-	{
-		if (startup_flag)
-		{
-			if (Input_Power_Q15 > Previous_Power_Q15)
-			{
-				if (step_direction)
-				{
-					Vin_reference_Q15 += MPPT_Step_Size_Q15;
-				}
-				else
-				{
-					Vin_reference_Q15 -= MPPT_Step_Size_Q15;
-				}
-			}
-			else
-			{
-				if (step_direction)
-				{
-					step_direction = !step_direction;
-					Vin_reference_Q15 -= MPPT_Step_Size_Q15;
-				}
-				else
-				{
-					step_direction = !step_direction;
-					Vin_reference_Q15 += MPPT_Step_Size_Q15;
-				}
-			}
-		}
-		else
-		{
-			Vin_reference_Q15 = 3276800; //100V
-		}
-	}
 	Previous_Power_Q15 = Input_Power_Q15;
 	GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
 	return;
@@ -305,7 +237,11 @@ interrupt void pwm_int()
 	Power_Samples_Q15[Power_Sample_Counter] = _IQmpy(Input_Voltage_Q15, Input_Current_Q15);
 	Power_Sample_Counter++;
 
+	Bus_Voltage_Q15 = (Bus_Voltage_Q15 >> 0);
+
 	Vin_err_Q15 = Input_Voltage_Q15 - Vin_reference_Q15;
+	//Vin_err_Q15 = Bus_Voltage_Q15;
+
 	if (first_run)
 	{
 		err_delay1 = Vin_err_Q15;
@@ -345,14 +281,8 @@ interrupt void pwm_int()
 	err_delay1 = Vin_err_Q15;
 
 	duty_output = ((long long int) v_comp_out >> 5);
-	Bus_Voltage_Q15 = (Bus_Voltage_Q15 >> 5) + duty_offset;
-	if(Bus_Voltage_Q15 < 0)
-	{
-		Bus_Voltage_Q15 = 0;
-	}
 
-	duty = Bus_Voltage_Q15;
-	//duty = ((unsigned int) duty_output);
+	duty = ((unsigned int) duty_output);
 
 	EPwm2Regs.TBPRD = Period_Table[0][duty];
 	EPwm3Regs.TBPRD = Period_Table[0][duty];
