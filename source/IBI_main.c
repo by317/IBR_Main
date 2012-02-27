@@ -7,9 +7,10 @@
 
 #define VIN_SCALE_INIT	430		//Scaling for Q15 Format
 #define VIN_OFFSET_INIT 10
-#define VBUS_SCALE_INIT	667		//Scaling for Q15 Format
+#define VBUS_SCALE_INIT	1		//Scaling for Q15 Format
 #define	I_SCALE_INIT	100		//Scaling for Q15 Format
 #define I_OFFSET_INIT		47
+#define VBUS_OFFSET_INIT	1900
 
 
 #define GLOBAL_Q	15
@@ -42,8 +43,8 @@
 #define INITIAL_MAX_VOLTAGE		45
 #define INITIAL_MAX_OPERATING_VOLTAGE	40
 
-#define TMAX	20000
-#define MIN_ON	400
+#define TMAX	2400
+#define MIN_ON	40000
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
@@ -64,7 +65,11 @@ unsigned int VBUS_SCALE;
 unsigned int I_SCALE;
 unsigned int I_OFFSET;
 unsigned int VIN_OFFSET;
+unsigned int VBUS_OFFSET;
+int bus_voltage_prescale;
 int input_voltage_prescale;
+
+unsigned int duty_offset;
 
 //MPPT Variables
 unsigned int step_direction;
@@ -272,12 +277,14 @@ interrupt void pwm_int()
 	DINT;
 	//GpioDataRegs.GPASET.bit.GPIO3 = 1;
 	//AdcRegs.ADCSOCFRC1.bit.SOC0 = 1;
-	//AdcRegs.ADCSOCFRC1.bit.SOC1 = 1;
+	AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
 	//AdcRegs.ADCSOCFRC1.bit.SOC2 = 1;
 	input_voltage_prescale = ((int) AdcResult.ADCRESULT0 - VIN_OFFSET);
 	Input_Voltage_Q15 = ((long int) input_voltage_prescale*VIN_SCALE);
 	input_current_prescale = ((int) AdcResult.ADCRESULT1 - I_OFFSET) - ((input_voltage_prescale*i_sense_v_gain) >> i_sense_v_shift);
 	Input_Current_Q15 = ((long int) (input_current_prescale )*I_SCALE);
+	bus_voltage_prescale = ((int) AdcResult.ADCRESULT2 - VBUS_OFFSET);
+	Bus_Voltage_Q15 = ((long int) bus_voltage_prescale*VBUS_SCALE);
 	if (!Power_Good)
 	{
 		if (Input_Current_Q15 > Hiccup_Current_Limit_Q15)
@@ -338,6 +345,13 @@ interrupt void pwm_int()
 	err_delay1 = Vin_err_Q15;
 
 	duty_output = ((long long int) v_comp_out >> 5);
+	Bus_Voltage_Q15 = (Bus_Voltage_Q15 >> 5) + duty_offset;
+	if(Bus_Voltage_Q15 < 0)
+	{
+		Bus_Voltage_Q15 = 0;
+	}
+
+	duty = Bus_Voltage_Q15;
 	//duty = ((unsigned int) duty_output);
 
 	EPwm2Regs.TBPRD = Period_Table[0][duty];
@@ -444,10 +458,10 @@ void SetupAdc(void)
 	AdcRegs.ADCSOC0CTL.bit.TRIGSEL = 0x07;
 	AdcRegs.ADCSOC0CTL.bit.CHSEL = 0x2;
 	AdcRegs.ADCSOC0CTL.bit.ACQPS = 0x6;	
-	//Output Voltage Sampling on SOC1
-//	AdcRegs.ADCSOC1CTL.bit.TRIGSEL = 0x00;
-//	AdcRegs.ADCSOC1CTL.bit.CHSEL = 0x0;
-//	AdcRegs.ADCSOC1CTL.bit.ACQPS = 0x6;
+	//Output Voltage Sampling on SOC2
+	AdcRegs.ADCSOC2CTL.bit.TRIGSEL = 0x07;
+	AdcRegs.ADCSOC2CTL.bit.CHSEL = 0x0;
+	AdcRegs.ADCSOC2CTL.bit.ACQPS = 0x6;
 //	//Input Current Sampling on SOC4
 //	AdcRegs.ADCSOC2CTL.bit.TRIGSEL = 0x00;
 //	AdcRegs.ADCSOC2CTL.bit.CHSEL = 0x4;
@@ -519,6 +533,9 @@ void initVariables (void)
 	Sample_Advance = 0;
 	i_sense_v_gain = 0;
 	i_sense_v_shift = 0;
+	bus_voltage_prescale = 0;
+	VBUS_OFFSET = VBUS_OFFSET_INIT;
+	duty_offset = 0;
 }
 
 void initialize_Period_Table(void)
