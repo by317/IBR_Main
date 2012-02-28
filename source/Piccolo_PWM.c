@@ -58,7 +58,7 @@ void InitEPwm2()
 	EPwm2Regs.CMPA.half.CMPA = 0;
 	
 	   // Set actions
-	EPwm2Regs.AQCTLA.bit.PRD = AQ_SET;             // Set PWM1A on Zero
+	EPwm2Regs.AQCTLA.bit.ZRO = AQ_SET;             // Set PWM1A on Zero
 	EPwm2Regs.AQCTLA.bit.CAD = AQ_CLEAR;
 	
 	

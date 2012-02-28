@@ -18,9 +18,11 @@
 //#define v_b1 -4190
 //#define v_b2 1814
 
-#define v_b0 256
-#define v_b1 -444
-#define v_b2 230
+#define v_b0 292
+#define v_b1 -310
+#define v_b2 82
+
+#define HV_REFERENCE 30
 
 #define INITIAL_DEADTIME_AFTER_Q1_OFF	5
 #define INITIAL_DEADTIME_AFTER_Q2_OFF	8
@@ -42,8 +44,8 @@
 #define INITIAL_MAX_VOLTAGE		45
 #define INITIAL_MAX_OPERATING_VOLTAGE	40
 
-#define TMAX	20000
-#define MIN_ON	400
+#define TMAX	1200
+#define MIN_ON	4000
 
 #define OUT_MAX 0x599A
 #define DELAY_MAX 45876 //(+1.4)
@@ -194,74 +196,74 @@ interrupt void mppt_int()
 	//Power_Good = GpioDataRegs.GPADAT.bit.GPIO16;
 	Power_Good = 1;
 	Output_Over_Voltage = GpioDataRegs.GPADAT.bit.GPIO17;
-	Power_Sample_Sum_Q15 = 0;
-	for (i = 0; i < Num_Power_Samples; i++)
-	{
-		Power_Sample_Sum_Q15 += Power_Samples_Q15[i];
-	}
-	Num_Power_Samples_Q15 =  _IQ15(Num_Power_Samples);
-	Input_Power_Q15 = _IQ15div(Power_Sample_Sum_Q15, Num_Power_Samples_Q15);
-	if (Input_Voltage_Q15 > Max_Voltage_Q15 || Output_Over_Voltage)
-	{
-		Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
-		startup_flag = 0;
-		delay_flag = 1;
-	}
-	else if (delay_flag)
-	{
-		Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
-		startup_flag = 0;
-	}
-	else if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
-	{
-		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size_Q15;
-		step_direction = 0;
-		startup_flag = 1;
-	}
-	else if (startup_flag && (Input_Voltage_Q15 <= Min_Operating_Voltage_Q15))
-	{
-		Vin_reference_Q15 = Min_Operating_Voltage_Q15 + MPPT_Step_Size_Q15;
-		step_direction = 1;
-	}
-	else if (startup_flag && (Input_Voltage_Q15 >= Max_Operating_Voltage_Q15))
-	{
-		Vin_reference_Q15 = Max_Operating_Voltage_Q15 - MPPT_Step_Size_Q15;
-		step_direction = 0;
-	}
-	else
-	{
-		if (startup_flag)
-		{
-			if (Input_Power_Q15 > Previous_Power_Q15)
-			{
-				if (step_direction)
-				{
-					Vin_reference_Q15 += MPPT_Step_Size_Q15;
-				}
-				else
-				{
-					Vin_reference_Q15 -= MPPT_Step_Size_Q15;
-				}
-			}
-			else
-			{
-				if (step_direction)
-				{
-					step_direction = !step_direction;
-					Vin_reference_Q15 -= MPPT_Step_Size_Q15;
-				}
-				else
-				{
-					step_direction = !step_direction;
-					Vin_reference_Q15 += MPPT_Step_Size_Q15;
-				}
-			}
-		}
-		else
-		{
-			Vin_reference_Q15 = 3276800; //100V
-		}
-	}
+//	Power_Sample_Sum_Q15 = 0;
+//	for (i = 0; i < Num_Power_Samples; i++)
+//	{
+//		Power_Sample_Sum_Q15 += Power_Samples_Q15[i];
+//	}
+//	Num_Power_Samples_Q15 =  _IQ15(Num_Power_Samples);
+//	Input_Power_Q15 = _IQ15div(Power_Sample_Sum_Q15, Num_Power_Samples_Q15);
+//	if (Input_Voltage_Q15 > Max_Voltage_Q15 || Output_Over_Voltage)
+//	{
+//		Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
+//		startup_flag = 0;
+//		delay_flag = 1;
+//	}
+//	else if (delay_flag)
+//	{
+//		Vin_reference_Q15 = High_Voltage_Reference_Q15; //100V
+//		startup_flag = 0;
+//	}
+//	else if (!startup_flag && Input_Voltage_Q15 > Min_Startup_Voltage_Q15)
+//	{
+//		Vin_reference_Q15 = Input_Voltage_Q15 - MPPT_Step_Size_Q15;
+//		step_direction = 0;
+//		startup_flag = 1;
+//	}
+//	else if (startup_flag && (Input_Voltage_Q15 <= Min_Operating_Voltage_Q15))
+//	{
+//		Vin_reference_Q15 = Min_Operating_Voltage_Q15 + MPPT_Step_Size_Q15;
+//		step_direction = 1;
+//	}
+//	else if (startup_flag && (Input_Voltage_Q15 >= Max_Operating_Voltage_Q15))
+//	{
+//		Vin_reference_Q15 = Max_Operating_Voltage_Q15 - MPPT_Step_Size_Q15;
+//		step_direction = 0;
+//	}
+//	else
+//	{
+//		if (startup_flag)
+//		{
+//			if (Input_Power_Q15 > Previous_Power_Q15)
+//			{
+//				if (step_direction)
+//				{
+//					Vin_reference_Q15 += MPPT_Step_Size_Q15;
+//				}
+//				else
+//				{
+//					Vin_reference_Q15 -= MPPT_Step_Size_Q15;
+//				}
+//			}
+//			else
+//			{
+//				if (step_direction)
+//				{
+//					step_direction = !step_direction;
+//					Vin_reference_Q15 -= MPPT_Step_Size_Q15;
+//				}
+//				else
+//				{
+//					step_direction = !step_direction;
+//					Vin_reference_Q15 += MPPT_Step_Size_Q15;
+//				}
+//			}
+//		}
+//		else
+//		{
+//			Vin_reference_Q15 = 3276800; //100V
+//		}
+//	}
 	Previous_Power_Q15 = Input_Power_Q15;
 	GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
 	return;
@@ -278,19 +280,19 @@ interrupt void pwm_int()
 	Input_Voltage_Q15 = ((long int) input_voltage_prescale*VIN_SCALE);
 	input_current_prescale = ((int) AdcResult.ADCRESULT1 - I_OFFSET) - ((input_voltage_prescale*i_sense_v_gain) >> i_sense_v_shift);
 	Input_Current_Q15 = ((long int) (input_current_prescale )*I_SCALE);
-	if (!Power_Good)
-	{
-		if (Input_Current_Q15 > Hiccup_Current_Limit_Q15)
-		{
-			Vin_reference_Q15 = High_Voltage_Reference_Q15;
-			startup_flag = 0;
-		}
-	}
-	if (Input_Current_Q15 > Current_Limit_Q15)
-	{
-		Vin_reference_Q15 = High_Voltage_Reference_Q15;
-		startup_flag = 0;
-	}
+//	if (!Power_Good)
+//	{
+//		if (Input_Current_Q15 > Hiccup_Current_Limit_Q15)
+//		{
+//			Vin_reference_Q15 = High_Voltage_Reference_Q15;
+//			startup_flag = 0;
+//		}
+//	}
+//	if (Input_Current_Q15 > Current_Limit_Q15)
+//	{
+//		Vin_reference_Q15 = High_Voltage_Reference_Q15;
+//		startup_flag = 0;
+//	}
 	if(Power_Sample_Counter >= Num_Power_Samples)
 	{
 		Power_Sample_Counter = 0;
@@ -338,13 +340,13 @@ interrupt void pwm_int()
 	err_delay1 = Vin_err_Q15;
 
 	duty_output = ((long long int) v_comp_out >> 5);
-	//duty = ((unsigned int) duty_output);
+	duty = ((unsigned int) duty_output);
 
 	EPwm2Regs.TBPRD = Period_Table[0][duty];
 	EPwm3Regs.TBPRD = Period_Table[0][duty];
 
 	EPwm2Regs.CMPA.half.CMPA = Period_Table[1][duty] + deadtime_after_Q1_off;
-	EPwm2Regs.CMPB = EPwm2Regs.TBPRD - (EPwm2Regs.CMPA.half.CMPA >> 1) + Sample_Advance;
+	//EPwm2Regs.CMPB = EPwm2Regs.TBPRD - (EPwm2Regs.CMPA.half.CMPA >> 1) + Sample_Advance;
 	EPwm3Regs.CMPB = Period_Table[1][duty];
 
 	if (EPwm3Regs.CMPB <= deadtime_after_Q2_off)
@@ -483,7 +485,7 @@ void initVariables (void)
 	control_gain = 0x8000;
 	v_temporary = 0;
 	//Vin_reference_Q15 = 0x8000;
-	Vin_reference_Q15 = _IQ15(100);
+	Vin_reference_Q15 = _IQ15(HV_REFERENCE);
 	Min_Startup_Voltage_Q15 = MIN_STARTUP_VOLTAGE;
 	Min_Operating_Voltage_Q15 = MIN_OPERATING_VOLTAGE;
 	Max_Operating_Voltage_Q15 = _IQ15(INITIAL_MAX_OPERATING_VOLTAGE);
@@ -511,7 +513,7 @@ void initVariables (void)
 	MPPT_Step_Size_Q15 = INITIAL_MPPT_STEP_SIZE;
 	Num_Power_Samples_Q15 = _IQ15(Num_Power_Samples);
 	Hiccup_Current_Limit_Q15 = _IQ15(INITIAL_HICCUP_CURRENT_LIMIT);
-	High_Voltage_Reference_Q15 = _IQ15(100);
+	High_Voltage_Reference_Q15 = _IQ15(HV_REFERENCE);
 	delay_flag = 0;
 	Current_Limit_Q15 = _IQ15(INITIAL_CURRENT_LIMIT);
 	duty_comp = 0;
