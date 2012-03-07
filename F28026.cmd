@@ -73,7 +73,7 @@ MEMORY
 PAGE 0:    /* Program Memory */
            /* Memory (RAM/FLASH/OTP) blocks can be moved to PAGE1 for data allocation */
 
-   PRAML0      : origin = 0x008000, length = 0x000700     /* on-chip RAM block L0 */
+   PRAML0      : origin = 0x008000, length = 0x000500     /* on-chip RAM block L0 */
    OTP         : origin = 0x3D7800, length = 0x000400     /* on-chip OTP */
    FLASHA      : origin = 0x3F7000, length = 0x000F80     /* on-chip FLASH */
    CSM_RSVD    : origin = 0x3F7F80, length = 0x000076     /* Part of FLASHA.  Program with all 0x0000 when CSM is in use. */
@@ -97,7 +97,7 @@ PAGE 1 :   /* Data Memory */
    BOOT_RSVD   : origin = 0x000000, length = 0x000050     /* Part of M0, BOOT rom will use this for stack */
    RAMM0       : origin = 0x000050, length = 0x0003B0     /* on-chip RAM block M0 */
    RAMM1       : origin = 0x000400, length = 0x000400     /* on-chip RAM block M1 */
-   DRAML0      : origin = 0x008600, length = 0x000A00     /* on-chip RAM block L0 */
+   DRAML0      : origin = 0x008500, length = 0x00B00     /* on-chip RAM block L0 */
    FLASHC      : origin = 0x3F5000, length = 0x002000     /* on-chip FLASH */
 	 FLASHD      : origin = 0x3F4000, length = 0x001000     /* on-chp FLASH */
 }
@@ -113,7 +113,7 @@ SECTIONS
 {
 
    /* Allocate program areas: */
-   .cinit              : > FLASHA      PAGE = 0
+   .cinit              : > FLASHB      PAGE = 0
    .pinit              : > FLASHA,     PAGE = 0
    .text               : > FLASHA      PAGE = 0
    codestart           : > BEGIN       PAGE = 0

@@ -10,7 +10,10 @@
 #define VBUS_SCALE_INIT	667		//Scaling for Q15 Format
 #define	I_SCALE_INIT	100		//Scaling for Q15 Format
 #define I_OFFSET_INIT		47
-
+#define wz_MRADS	_IQ15(0.025133)
+#define wz2_MRADS	_IQ15(631)
+#define zeta 0.3
+#define K	102
 
 #define GLOBAL_Q	15
 
@@ -58,7 +61,7 @@
 //#pragma CODE_SECTION(_IQ15int, "ramfuncs");
 //#pragma CODE_SECTION(_IQ15frac, "ramfuncs");
 //#pragma CODE_SECTION(__IQsat, "ramfuncs");
-#pragma CODE_SECTION(_IQ15div, "ramfuncs");
+//#pragma CODE_SECTION(_IQ15div, "ramfuncs");
 
 //ADC Scaling/Offset Variables
 unsigned int VIN_SCALE;
@@ -82,6 +85,8 @@ long int Hiccup_Current_Limit_Q15;
 long int Current_Limit_Q15;
 int step_dir;
 int input_current_prescale;
+
+int b_coeff;
 
 //System Status Variables
 unsigned int Power_Good;
@@ -112,7 +117,7 @@ volatile long int out_delay1;
 volatile long int Vin_reference_Q15;
 volatile long long int v_comp_out;
 volatile long int Vin_err_Q15;
-volatile long int control_gain;
+
 volatile long long int v_temporary;
 long int High_Voltage_Reference_Q15;
 volatile long int duty_comp;
@@ -124,7 +129,7 @@ unsigned int deadtime_after_Q2_off_hi_res;
 unsigned int early_turn_on_Q2;
 
 long int Power_Samples_Q15[MAX_POWER_SAMPLES];
-unsigned int Period_Table[2][1001];
+unsigned int Period_Table[4][501];
 unsigned int Num_Power_Samples;
 unsigned int Power_Sample_Counter;
 long int Power_Sample_Sum_Q15;
@@ -134,6 +139,8 @@ unsigned int duty_knee;
 
 int i_sense_v_gain;
 int i_sense_v_shift;
+
+int32 Temp_Variable;
 
 unsigned int i;
 unsigned int Sample_Advance;
@@ -309,9 +316,11 @@ interrupt void pwm_int()
 		first_run = 0;
 	}
 
-	v_temporary = (Vin_err_Q15*v_b0) >> 15;
-	v_temporary = v_temporary + ((err_delay1*v_b1)>>15);
-	v_temporary = v_temporary + ((err_delay2*v_b2)>>15);
+	b_coeff = -2*((int) Period_Table[3][duty >> 1]) - 80;
+
+	v_temporary = (Vin_err_Q15*Period_Table[2][duty >> 1]) >> 15;
+	v_temporary = v_temporary + ((err_delay1*b_coeff)>>15);
+	v_temporary = v_temporary + ((err_delay2*Period_Table[3][duty >> 1])>>15);
 	v_temporary = v_temporary + (out_delay1);
 	v_temporary = v_temporary;
 
@@ -342,12 +351,12 @@ interrupt void pwm_int()
 	duty_output = ((long long int) v_comp_out >> 5);
 	duty = ((unsigned int) duty_output);
 
-	EPwm2Regs.TBPRD = Period_Table[0][duty];
-	EPwm3Regs.TBPRD = Period_Table[0][duty];
+	EPwm2Regs.TBPRD = Period_Table[0][duty >> 1];
+	EPwm3Regs.TBPRD = Period_Table[0][duty >> 1];
 
-	EPwm2Regs.CMPA.half.CMPA = Period_Table[1][duty] + deadtime_after_Q1_off;
+	EPwm2Regs.CMPA.half.CMPA = Period_Table[1][duty >> 1] + deadtime_after_Q1_off;
 	//EPwm2Regs.CMPB = EPwm2Regs.TBPRD - (EPwm2Regs.CMPA.half.CMPA >> 1) + Sample_Advance;
-	EPwm3Regs.CMPB = Period_Table[1][duty];
+	EPwm3Regs.CMPB = Period_Table[1][duty >> 1];
 
 	if (EPwm3Regs.CMPB <= deadtime_after_Q2_off)
 	{
@@ -482,7 +491,6 @@ void initVariables (void)
 	VBUS_SCALE = VBUS_SCALE_INIT;
 	I_SCALE = I_SCALE_INIT;
 	I_OFFSET = I_OFFSET_INIT;
-	control_gain = 0x8000;
 	v_temporary = 0;
 	//Vin_reference_Q15 = 0x8000;
 	Vin_reference_Q15 = _IQ15(HV_REFERENCE);
@@ -525,10 +533,13 @@ void initVariables (void)
 
 void initialize_Period_Table(void)
 {
-	long int temp = ((long int) MIN_ON*1000)/TMAX;
+	long int temp = ((long int) MIN_ON*500)/TMAX;
 	duty_knee = ((unsigned int) temp);
 	int k;
-	for (k = 0; k <= 1000; k++)
+	int32 A;
+	int32 C;
+
+	for (k = 0; k <= 500; k++)
 	{
 		if (k == 0)
 		{
@@ -538,25 +549,31 @@ void initialize_Period_Table(void)
 		else if (k <= duty_knee)
 		{
 			Period_Table[0][k] = TMAX;
-			temp = ((long int) k)*((long int) TMAX)/1000;
+			temp = ((long int) k)*((long int) TMAX)/500;
 			Period_Table[1][k] = temp;
 		}
-		else if (k <= 500)
+		else if (k <= 250)
 		{
-			Period_Table[0][k] = ((long int) MIN_ON*1000)/k;
+			Period_Table[0][k] = ((long int) MIN_ON*500)/k;
 			Period_Table[1][k] = MIN_ON;
 		}
-		else if (k <= (1000 - duty_knee))
+		else if (k <= (500 - duty_knee))
 		{
-			Period_Table[0][k] = ((long int) MIN_ON*1000)/(1000 - k);
+			Period_Table[0][k] = ((long int) MIN_ON*500)/(500 - k);
 			Period_Table[1][k] = Period_Table[0][k] - MIN_ON;
 		}
 		else
 		{
 			Period_Table[0][k] = TMAX;
-			temp = ((long int) k)*((long int) TMAX)/1000;
+			temp = ((long int) k)*((long int) TMAX)/500;
 			Period_Table[1][k] = temp;
 			//Period_Table[1][k] = TMAX - Period_Table[1][k];
 		}
+
+		C = ((long int) 317482/ ((long int)Period_Table[0][k]));
+		A = C + 80 + (_IQmpy(_IQ15(0.0557), Period_Table[0][k]));
+
+		Period_Table[2][k] = ((int) A);
+		Period_Table[3][k] = ((int) C);
 	}
 }
