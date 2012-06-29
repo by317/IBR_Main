@@ -94,9 +94,9 @@ void main()
 	PieCtrlRegs.PIEIER3.bit.INTx1 = 0x1;
 	//EPwm1Regs.TBPRD = 870;
 	Falling_Edge_Deadtime = 7;
-	Q1_Pulse_Length = 72;
-	Q2_Pulse_Length = 480;
-	Period = 870;
+	Q1_Pulse_Length = 1200;
+	Q2_Pulse_Length = 0;
+	Period = 1200;
 	EDIS;
 	IER |= M_INT3;
 	EINT;
@@ -161,6 +161,22 @@ interrupt void pwm_int()
 	err_delay2 = err_delay1;
 	err_delay1 = Vin_err_Q15;
 
+	if(Q1_Pulse_Length <= 900)
+	{
+		Period = Q1_Pulse_Length + 300;
+		Q2_Pulse_Length = 300;
+	}
+	else if(Q1_Pulse_Length <= 1200)
+	{
+		Period = 1200;
+		Q2_Pulse_Length = 1200 - Q1_Pulse_Length;
+	}
+	else
+	{
+		Q1_Pulse_Length = 1200;
+		Q2_Pulse_Length = 0;
+		Period = 1200;
+	}
 	EPwm1Regs.TBPRD = Period;
 	EPwm2Regs.TBPRD = Period;
 
